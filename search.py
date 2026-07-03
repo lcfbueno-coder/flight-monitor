@@ -2,34 +2,24 @@
 Flight Price Monitor — versão Playwright / Google Flights
 """
 
-import re
-import json
-import os
-import statistics
-import time
-import random
+import re, json, os, statistics, time, random
 from datetime import datetime, timedelta
 from playwright.sync_api import sync_playwright
 import requests
 
-# ─── Credenciais ──────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 OUTPUT_DIR       = os.environ.get("OUTPUT_DIR", "docs")
 
-# ─── Configuração ─────────────────────────────────────────────────────────────
 TRIP_DURATION      = 10
 SEARCH_OFFSET      = 45
 MIN_POINTS_FOR_PCT = 5
-DELAY_BETWEEN      = (8, 14)
+DELAY_BETWEEN      = (12, 18)
+MIN_PRICE          = 900
+MAX_PRICE          = 120_000
 
 MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun",
              "Jul","Ago","Set","Out","Nov","Dez"]
-MONTHS_LONG = {
-    1:"janeiro",2:"fevereiro",3:"março",4:"abril",
-    5:"maio",6:"junho",7:"julho",8:"agosto",
-    9:"setembro",10:"outubro",11:"novembro",12:"dezembro"
-}
 KNOWN_AIRLINES = [
     "LATAM","GOL","Azul","TAP","Iberia","Air France","KLM",
     "Lufthansa","Swiss","Turkish Airlines","EgyptAir","Emirates",
@@ -38,7 +28,6 @@ KNOWN_AIRLINES = [
     "Sky Airline","JetSMART","ITA Airways",
 ]
 
-# ─── Rotas ────────────────────────────────────────────────────────────────────
 ROUTES = [
     {"id":"GRU-CUN","origin":"GRU","dest":"CUN","from_city":"São Paulo",    "to_city":"Cancún",       "flag":"🇲🇽"},
     {"id":"GRU-MIA","origin":"GRU","dest":"MIA","from_city":"São Paulo",    "to_city":"Miami",        "flag":"🇺🇸"},
@@ -59,22 +48,21 @@ ROUTES = [
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def parse_brl_prices(text):
-    matches = re.findall(r'R\$\s*([\d]{1,3}(?:\.[\d]{3})*)', text)
+def parse_brl_prices(text, min_p=MIN_PRICE):
     prices = []
-    for m in matches:
+    for m in re.findall(r'R\$\s*([\d]{1,3}(?:\.[\d]{3})*)', text):
         try:
-            val = float(m.replace('.', ''))
-            if 200 < val < 120_000:
-                prices.append(val)
+            v = float(m.replace('.', ''))
+            if min_p <= v <= MAX_PRICE:
+                prices.append(v)
         except Exception:
             pass
     return prices
 
 def detect_airline(text):
-    text_lower = text.lower()
+    tl = text.lower()
     for a in KNOWN_AIRLINES:
-        if a.lower() in text_lower:
+        if a.lower() in tl:
             return a
     return "—"
 
@@ -83,8 +71,8 @@ def fmt_date(d):
     dt = datetime.strptime(d, "%Y-%m-%d")
     return f"{dt.day:02d} {MONTHS_PT[dt.month-1]}"
 
-def build_kayak_link(origin, dest, dep, ret):
-    return f"https://www.kayak.com.br/flights/{origin}-{dest}/{dep}/{ret}"
+def build_kayak_link(o, d, dep, ret):
+    return f"https://www.kayak.com.br/flights/{o}-{d}/{dep}/{ret}"
 
 def get_status(pct, n):
     if n < MIN_POINTS_FOR_PCT: return "new"
@@ -94,16 +82,16 @@ def get_status(pct, n):
     if pct >= 20:  return "high"
     return "normal"
 
-def load_json(filepath, default=None):
+def load_json(path, default=None):
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return default if default is not None else {}
 
-def save_json(filepath, data):
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, "w", encoding="utf-8") as f:
+def save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def send_telegram(msg):
@@ -120,24 +108,18 @@ def send_telegram(msg):
         print(f"  [Telegram] {e}")
 
 
-# ─── Google Flights scraper ───────────────────────────────────────────────────
+# ─── Scraper ──────────────────────────────────────────────────────────────────
 
 class GFlightsScraper:
 
     def __init__(self, pw):
         self.browser = pw.chromium.launch(
             headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--disable-blink-features=AutomationControlled",
-                "--lang=pt-BR",
-            ],
+            args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu",
+                  "--disable-blink-features=AutomationControlled","--lang=pt-BR"],
         )
         self.ctx = self.browser.new_context(
-            locale="pt-BR",
-            timezone_id="America/Sao_Paulo",
+            locale="pt-BR", timezone_id="America/Sao_Paulo",
             viewport={"width": 1366, "height": 768},
             user_agent=(
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -145,64 +127,29 @@ class GFlightsScraper:
             ),
         )
         self._cookies_done = False
-        self._debug_done   = False   # salva screenshot só da primeira rota
 
-    def _accept_cookies(self, page):
-        if self._cookies_done:
-            return
-        for label in ["Aceitar tudo", "Accept all", "Concordar com tudo",
-                       "Tout accepter", "Agree to all", "I agree"]:
+    def _dismiss(self, page):
+        if self._cookies_done: return
+        for label in ["Aceitar tudo","Accept all","Concordar com tudo","Agree to all"]:
             try:
-                page.get_by_role("button", name=label).click(timeout=2500)
+                page.get_by_role("button", name=label).click(timeout=2000)
                 self._cookies_done = True
-                time.sleep(1)
+                time.sleep(0.8)
                 return
             except Exception:
                 pass
 
-    def _try_fill(self, page, code):
+    def _type_and_confirm(self, page, code):
         """
-        Tenta preencher um campo de aeroporto de várias formas.
-        Retorna True se conseguiu confirmar uma opção no autocomplete.
+        Digita um código de aeroporto no campo que estiver com foco
+        e confirma com ArrowDown + Enter (mais confiável que clicar na opção).
         """
-        # Lista de seletores a tentar — do mais específico ao mais genérico
-        selectors = [
-            # Por placeholder (mais estável)
-            'input[placeholder*="De onde"]',
-            'input[placeholder*="Where from"]',
-            'input[placeholder*="Para onde"]',
-            'input[placeholder*="Where to"]',
-            'input[placeholder*="Origem"]',
-            'input[placeholder*="Destino"]',
-            # Por aria-label
-            'input[aria-label*="De onde"]',
-            'input[aria-label*="Where from"]',
-            'input[aria-label*="Para onde"]',
-            'input[aria-label*="Where to"]',
-            # Genérico: qualquer input de texto visível
-            'input[type="text"]:visible',
-        ]
-
-        for sel in selectors:
-            try:
-                els = page.locator(sel).all()
-                for el in els:
-                    try:
-                        el.click(timeout=2000)
-                        time.sleep(0.4)
-                        el.press("Control+a")
-                        el.type(code, delay=90)
-                        time.sleep(2.0)
-                        opts = page.get_by_role("option").all()
-                        if opts:
-                            opts[0].click()
-                            time.sleep(0.7)
-                            return True
-                    except Exception:
-                        continue
-            except Exception:
-                continue
-        return False
+        page.keyboard.type(code, delay=110)
+        time.sleep(2.2)
+        page.keyboard.press("ArrowDown")
+        time.sleep(0.4)
+        page.keyboard.press("Enter")
+        time.sleep(1.0)
 
     def search(self, origin, dest, dep_date, ret_date):
         page = self.ctx.new_page()
@@ -210,111 +157,193 @@ class GFlightsScraper:
         try:
             return self._search(page, origin, dest, dep_date, ret_date)
         except Exception as e:
-            print(f"    [erro geral] {e}")
+            print(f"    [erro geral] {type(e).__name__}: {e}")
             return None, "—"
         finally:
             page.close()
 
     def _search(self, page, origin, dest, dep_date, ret_date):
+        # ── 1. Abrir página ──────────────────────────────────────────────────
         page.goto(
             "https://www.google.com/travel/flights?hl=pt-BR&gl=BR&curr=BRL",
-            wait_until="domcontentloaded",
-            timeout=30000,
+            wait_until="domcontentloaded", timeout=30000,
         )
-        time.sleep(random.uniform(3, 5))
-        self._accept_cookies(page)
-        time.sleep(1)
+        time.sleep(random.uniform(3, 4))
+        self._dismiss(page)
+        time.sleep(0.8)
 
-        # Screenshot de diagnóstico (só na primeira rota)
-        if not self._debug_done:
+        # ── 2. ORIGEM ────────────────────────────────────────────────────────
+        # O campo "De onde?" pode ser input ou div contenteditable.
+        # Seletores baseados no que o screenshot mostrou.
+        origin_clicked = False
+        for sel in [
+            '[placeholder="De onde?"]',
+            '[placeholder*="De onde"]',
+            '[aria-label*="De onde"]',
+            '[placeholder*="Where from"]',
+            '[aria-label*="Where from"]',
+        ]:
             try:
-                page.screenshot(path="debug_page.png", full_page=True)
-                print("    [debug] screenshot salvo em debug_page.png")
-            except Exception as e:
-                print(f"    [debug screenshot erro] {e}")
-            self._debug_done = True
+                el = page.locator(sel).first
+                el.wait_for(state="visible", timeout=4000)
+                el.click()
+                time.sleep(0.5)
+                # Limpar qualquer conteúdo anterior
+                el.press("Control+a")
+                el.press("Backspace")
+                time.sleep(0.3)
+                origin_clicked = True
+                print(f"    campo origem encontrado: {sel}")
+                break
+            except Exception:
+                continue
 
-        # Imprimir texto da página para diagnóstico
-        try:
-            body = page.inner_text("body")
-            preview = body[:300].replace("\n", " ")
-            print(f"    [página] {preview}...")
-        except Exception:
-            pass
-
-        # Preencher origem
-        print(f"    preenchendo origem: {origin}")
-        if not self._try_fill(page, origin):
-            print(f"    [origem falhou]")
+        if not origin_clicked:
+            print(f"    [campo origem não encontrado]")
             return None, "—"
 
-        # Preencher destino
-        print(f"    preenchendo destino: {dest}")
-        if not self._try_fill(page, dest):
-            print(f"    [destino falhou]")
-            return None, "—"
+        self._type_and_confirm(page, origin)
+        print(f"    origem '{origin}' digitada")
 
-        # Datas — tenta preencher via aria-label
+        # ── 3. DESTINO ───────────────────────────────────────────────────────
+        # Após confirmar origem, o Google Flights move o foco para o destino.
+        # Verificamos se o foco está em "Para onde?" antes de digitar.
+        time.sleep(0.5)
+
+        # Tenta clicar explicitamente no campo de destino
+        dest_clicked = False
+        for sel in [
+            '[placeholder="Para onde?"]',
+            '[placeholder*="Para onde"]',
+            '[aria-label*="Para onde"]',
+            '[placeholder*="Where to"]',
+            '[aria-label*="Where to"]',
+        ]:
+            try:
+                el = page.locator(sel).first
+                el.wait_for(state="visible", timeout=3000)
+                el.click()
+                time.sleep(0.5)
+                el.press("Control+a")
+                el.press("Backspace")
+                time.sleep(0.3)
+                dest_clicked = True
+                print(f"    campo destino encontrado: {sel}")
+                break
+            except Exception:
+                continue
+
+        if not dest_clicked:
+            # Fallback: digitar direto (foco automático do Google)
+            print(f"    destino via foco automático")
+
+        self._type_and_confirm(page, dest)
+        print(f"    destino '{dest}' digitado")
+
+        # ── 4. DATAS ─────────────────────────────────────────────────────────
+        # Baseado no screenshot: campos "Partida" e "Volta"
         dep_dt = datetime.strptime(dep_date, "%Y-%m-%d")
         ret_dt = datetime.strptime(ret_date, "%Y-%m-%d")
 
-        for date_str, keywords in [
-            (dep_date, ["Partida","Departure","Data de partida","Data ida"]),
-            (ret_date, ["Volta","Return","Data de volta","Data volta"]),
+        # Formatos de data a tentar
+        dep_fmts = [
+            f"{dep_dt.day:02d}/{dep_dt.month:02d}/{dep_dt.year}",
+            dep_date,
+        ]
+        ret_fmts = [
+            f"{ret_dt.day:02d}/{ret_dt.month:02d}/{ret_dt.year}",
+            ret_date,
+        ]
+
+        for fmts, keywords in [
+            (dep_fmts, ["Partida","Departure","Data de partida","Check-in"]),
+            (ret_fmts, ["Volta","Return","Data de volta","Check-out"]),
         ]:
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-            formats = [
-                date_str,
-                f"{dt.day}/{dt.month}/{dt.year}",
-                f"{dt.day:02d}/{dt.month:02d}/{dt.year}",
-            ]
+            clicked = False
             for kw in keywords:
-                for sel in [f'input[aria-label*="{kw}"]', f'[aria-label*="{kw}"]']:
+                for attr in ["placeholder", "aria-label", "aria-placeholder"]:
+                    sel = f'[{attr}*="{kw}"]'
                     try:
                         el = page.locator(sel).first
-                        el.wait_for(timeout=2000)
-                        for fmt in formats:
+                        el.wait_for(state="visible", timeout=2000)
+                        el.click()
+                        time.sleep(0.5)
+                        clicked = True
+                        # Tentar digitar a data
+                        for fmt in fmts:
                             try:
-                                el.click(timeout=2000)
-                                el.press("Control+a")
-                                el.type(fmt, delay=60)
-                                el.press("Enter")
-                                time.sleep(0.8)
+                                page.keyboard.press("Control+a")
+                                page.keyboard.type(fmt, delay=60)
+                                time.sleep(0.4)
+                                page.keyboard.press("Enter")
+                                time.sleep(0.6)
                                 break
                             except Exception:
                                 pass
                         break
                     except Exception:
-                        pass
+                        continue
+                if clicked:
+                    break
 
-        # Pesquisar
+            if not clicked:
+                print(f"    [data não configurada para {fmts[0]}]")
+
+        # ── 5. PESQUISAR ─────────────────────────────────────────────────────
+        searched = False
         for btn in ["Pesquisar", "Search", "Buscar"]:
             try:
                 page.get_by_role("button", name=btn).click(timeout=3000)
+                searched = True
+                print(f"    botão '{btn}' clicado")
                 break
             except Exception:
                 pass
-        else:
+        if not searched:
             page.keyboard.press("Enter")
+            print(f"    busca via Enter")
 
-        time.sleep(random.uniform(7, 11))
+        # ── 6. AGUARDAR RESULTADOS ───────────────────────────────────────────
+        print(f"    aguardando resultados...")
+        time.sleep(random.uniform(9, 13))
         try:
-            page.wait_for_load_state("networkidle", timeout=15000)
+            page.wait_for_load_state("networkidle", timeout=20000)
         except Exception:
             pass
-        time.sleep(2)
+        time.sleep(3)
 
+        # Screenshot de diagnóstico (primeira rota apenas)
+        try:
+            if not os.path.exists("debug_results.png"):
+                page.screenshot(path="debug_results.png", full_page=False)
+                print(f"    [debug] screenshot dos resultados salvo")
+        except Exception:
+            pass
+
+        # ── 7. EXTRAIR PREÇOS ────────────────────────────────────────────────
         body_text = page.inner_text("body")
+
         if "captcha" in body_text.lower() or "não sou um robô" in body_text.lower():
             print("    [CAPTCHA detectado]")
             return None, "—"
 
-        prices = parse_brl_prices(body_text)
+        # Mostrar URL atual (diagnóstico — confirma se a busca aconteceu)
+        print(f"    URL atual: {page.url[:80]}")
+
+        # Todos os preços encontrados (diagnóstico)
+        all_raw = [float(m.replace('.',''))
+                   for m in re.findall(r'R\$\s*([\d]{1,3}(?:\.[\d]{3})*)', body_text)
+                   if 100 <= float(m.replace('.','')) <= MAX_PRICE]
+        print(f"    preços na página: {sorted(set(all_raw))[:12]}")
+
+        prices = [v for v in all_raw if v >= MIN_PRICE]
         if not prices:
-            print("    [nenhum preço encontrado]")
+            print(f"    [sem preços acima de R$ {MIN_PRICE}]")
             return None, "—"
 
-        return min(prices), detect_airline(body_text)
+        best = min(prices)
+        airline = detect_airline(body_text)
+        return best, airline
 
     def close(self):
         self.browser.close()
@@ -324,25 +353,20 @@ class GFlightsScraper:
 
 def main():
     print(f"▶ Flight Monitor — {datetime.now().strftime('%Y-%m-%d %H:%M')} UTC")
-
     today     = datetime.now().date()
     dep_date  = (today + timedelta(days=SEARCH_OFFSET)).strftime("%Y-%m-%d")
     ret_date  = (today + timedelta(days=SEARCH_OFFSET + TRIP_DURATION)).strftime("%Y-%m-%d")
     today_str = today.strftime("%Y-%m-%d")
     cutoff    = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-
     print(f"  Ida: {dep_date}  |  Volta: {ret_date}")
 
     history_path = os.path.join(OUTPUT_DIR, "history.json")
     data_path    = os.path.join(OUTPUT_DIR, "data.json")
     history = load_json(history_path, default={})
-
-    results = []
-    alerts  = []
+    results, alerts = [], []
 
     with sync_playwright() as pw:
         scraper = GFlightsScraper(pw)
-
         for route in ROUTES:
             print(f"  → {route['id']}  {route['from_city']} → {route['to_city']}")
             price, airline = scraper.search(route["origin"], route["dest"], dep_date, ret_date)
@@ -358,12 +382,12 @@ def main():
             hist.append({"date": today_str, "price": price})
             history[rid] = hist
 
-            prices_list = [h["price"] for h in hist]
-            n      = len(prices_list)
-            median = statistics.median(prices_list) if n > 1 else price
-            pct    = round((price - median) / median * 100, 1) if n > 1 else 0.0
-            status = get_status(pct, n)
-            link   = build_kayak_link(route["origin"], route["dest"], dep_date, ret_date)
+            pl   = [h["price"] for h in hist]
+            n    = len(pl)
+            med  = statistics.median(pl) if n > 1 else price
+            pct  = round((price - med) / med * 100, 1) if n > 1 else 0.0
+            stat = get_status(pct, n)
+            link = build_kayak_link(route["origin"], route["dest"], dep_date, ret_date)
 
             result = {
                 "id": rid, "from": route["from_city"], "to": route["to_city"],
@@ -371,17 +395,17 @@ def main():
                 "airline": airline, "price": round(price),
                 "dep_date": dep_date, "ret_date": ret_date,
                 "dep_fmt": fmt_date(dep_date), "ret_fmt": fmt_date(ret_date),
-                "median_30d": round(median), "pct_change": pct,
-                "status": status, "n_points": n, "link": link,
+                "median_30d": round(med), "pct_change": pct,
+                "status": stat, "n_points": n, "link": link,
             }
             results.append(result)
-            print(f"     R$ {price:,.0f} via {airline}  {pct:+.0f}%  [{status}]")
+            print(f"     R$ {price:,.0f} via {airline}  {pct:+.0f}%  [{stat}]")
 
-            if status in ("error", "fire") and n >= MIN_POINTS_FOR_PCT:
-                icon = "🚨 POSSÍVEL ERRO DE TARIFA" if status == "error" else "🔥 PROMOÇÃO EXCEPCIONAL"
+            if stat in ("error","fire") and n >= MIN_POINTS_FOR_PCT:
+                icon = "🚨 POSSÍVEL ERRO DE TARIFA" if stat == "error" else "🔥 PROMOÇÃO EXCEPCIONAL"
                 alerts.append(
                     f"{icon}\n\n✈️ <b>{route['from_city']} → {route['to_city']}</b>\n\n"
-                    f"💰 Preço: <b>R$ {price:,.0f}</b>\n📊 Mediana 30d: R$ {median:,.0f}\n"
+                    f"💰 Preço: <b>R$ {price:,.0f}</b>\n📊 Mediana 30d: R$ {med:,.0f}\n"
                     f"📉 Variação: <b>{pct:+.0f}%</b>\n🏢 Cia: {airline}\n"
                     f"📅 Ida: {fmt_date(dep_date)}  |  Volta: {fmt_date(ret_date)}\n\n"
                     f"🔗 <a href='{link}'>Ver no Kayak</a>"
@@ -393,13 +417,11 @@ def main():
 
     results.sort(key=lambda r: r["pct_change"] if r["status"] != "new" else 999)
     payload = {
-        "updated_at":  datetime.utcnow().isoformat() + "Z",
+        "updated_at": datetime.utcnow().isoformat() + "Z",
         "updated_fmt": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "total":       len(results),
-        "routes":      results,
+        "total": len(results), "routes": results,
     }
-
-    save_json(data_path,    payload)
+    save_json(data_path, payload)
     save_json(history_path, history)
     print(f"✓ {len(results)} rotas salvas em {OUTPUT_DIR}/")
 
