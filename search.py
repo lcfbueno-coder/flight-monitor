@@ -14,7 +14,7 @@ OUTPUT_DIR       = os.environ.get("OUTPUT_DIR", "docs")
 TRIP_DURATION      = 10
 SEARCH_OFFSET      = 45
 MIN_POINTS_FOR_PCT = 5
-DELAY_BETWEEN      = (12, 18)
+DELAY_BETWEEN      = (5, 8)
 MIN_PRICE          = 900
 MAX_PRICE          = 120_000
 
@@ -185,7 +185,7 @@ class GFlightsScraper:
         ]:
             try:
                 el = page.locator(sel).first
-                el.wait_for(state="visible", timeout=4000)
+                el.wait_for(state="visible", timeout=2000)
                 el.click()
                 time.sleep(0.5)
                 # Limpar qualquer conteúdo anterior
@@ -305,12 +305,12 @@ class GFlightsScraper:
 
         # ── 6. AGUARDAR RESULTADOS ───────────────────────────────────────────
         print(f"    aguardando resultados...")
-        time.sleep(random.uniform(9, 13))
+        time.sleep(random.uniform(6, 9))
         try:
-            page.wait_for_load_state("networkidle", timeout=20000)
+            page.wait_for_load_state("networkidle", timeout=12000)
         except Exception:
             pass
-        time.sleep(3)
+        time.sleep(2)
 
         # Screenshot de diagnóstico (primeira rota apenas)
         try:
