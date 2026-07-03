@@ -1,8 +1,5 @@
 """
 Flight Price Monitor — versão Playwright / Google Flights
-Gera data.json e history.json localmente na pasta public/.
-O GitHub Actions commita os arquivos de volta ao repositório.
-O GitHub Pages serve o painel diretamente — sem FTP.
 """
 
 import re
@@ -15,33 +12,30 @@ from datetime import datetime, timedelta
 from playwright.sync_api import sync_playwright
 import requests
 
-# ─── Credenciais (GitHub Secrets) ────────────────────────────────────────────
+# ─── Credenciais ──────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+OUTPUT_DIR       = os.environ.get("OUTPUT_DIR", "docs")
 
-# Pasta de saída local (dentro do repositório, servida pelo GitHub Pages)
-OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "docs")
 # ─── Configuração ─────────────────────────────────────────────────────────────
-TRIP_DURATION      = 10   # dias de estadia padrão
-SEARCH_OFFSET      = 45   # busca voos com X dias de antecedência
-MIN_POINTS_FOR_PCT = 5    # dias mínimos de histórico para calcular variação
-DELAY_BETWEEN      = (8, 14)  # pausa aleatória entre rotas (segundos)
+TRIP_DURATION      = 10
+SEARCH_OFFSET      = 45
+MIN_POINTS_FOR_PCT = 5
+DELAY_BETWEEN      = (8, 14)
 
 MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun",
              "Jul","Ago","Set","Out","Nov","Dez"]
-
 MONTHS_LONG = {
-    1:"janeiro", 2:"fevereiro", 3:"março", 4:"abril",
-    5:"maio", 6:"junho", 7:"julho", 8:"agosto",
-    9:"setembro", 10:"outubro", 11:"novembro", 12:"dezembro"
+    1:"janeiro",2:"fevereiro",3:"março",4:"abril",
+    5:"maio",6:"junho",7:"julho",8:"agosto",
+    9:"setembro",10:"outubro",11:"novembro",12:"dezembro"
 }
-
 KNOWN_AIRLINES = [
-    "LATAM", "GOL", "Azul", "TAP", "Iberia", "Air France", "KLM",
-    "Lufthansa", "Swiss", "Turkish Airlines", "EgyptAir", "Emirates",
-    "Qatar Airways", "American Airlines", "United", "Delta",
-    "British Airways", "Copa Airlines", "Aerolíneas Argentinas",
-    "Sky Airline", "JetSMART", "ITA Airways",
+    "LATAM","GOL","Azul","TAP","Iberia","Air France","KLM",
+    "Lufthansa","Swiss","Turkish Airlines","EgyptAir","Emirates",
+    "Qatar Airways","American Airlines","United","Delta",
+    "British Airways","Copa Airlines","Aerolíneas Argentinas",
+    "Sky Airline","JetSMART","ITA Airways",
 ]
 
 # ─── Rotas ────────────────────────────────────────────────────────────────────
@@ -63,8 +57,7 @@ ROUTES = [
     {"id":"FLN-BRC","origin":"FLN","dest":"BRC","from_city":"Florianópolis","to_city":"Bariloche",    "flag":"🇦🇷"},
 ]
 
-
-# ─── Helpers de preço ─────────────────────────────────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def parse_brl_prices(text):
     matches = re.findall(r'R\$\s*([\d]{1,3}(?:\.[\d]{3})*)', text)
@@ -78,7 +71,6 @@ def parse_brl_prices(text):
             pass
     return prices
 
-
 def detect_airline(text):
     text_lower = text.lower()
     for a in KNOWN_AIRLINES:
@@ -86,19 +78,13 @@ def detect_airline(text):
             return a
     return "—"
 
-
-# ─── Helpers de data ──────────────────────────────────────────────────────────
-
 def fmt_date(d):
-    if not d:
-        return "—"
+    if not d: return "—"
     dt = datetime.strptime(d, "%Y-%m-%d")
     return f"{dt.day:02d} {MONTHS_PT[dt.month-1]}"
 
-
 def build_kayak_link(origin, dest, dep, ret):
     return f"https://www.kayak.com.br/flights/{origin}-{dest}/{dep}/{ret}"
-
 
 def get_status(pct, n):
     if n < MIN_POINTS_FOR_PCT: return "new"
@@ -108,9 +94,6 @@ def get_status(pct, n):
     if pct >= 20:  return "high"
     return "normal"
 
-
-# ─── Arquivos locais (sem FTP) ────────────────────────────────────────────────
-
 def load_json(filepath, default=None):
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -118,14 +101,10 @@ def load_json(filepath, default=None):
     except Exception:
         return default if default is not None else {}
 
-
 def save_json(filepath, data):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-# ─── Telegram ────────────────────────────────────────────────────────────────
 
 def send_telegram(msg):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
@@ -153,6 +132,7 @@ class GFlightsScraper:
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--disable-blink-features=AutomationControlled",
+                "--lang=pt-BR",
             ],
         )
         self.ctx = self.browser.new_context(
@@ -165,11 +145,13 @@ class GFlightsScraper:
             ),
         )
         self._cookies_done = False
+        self._debug_done   = False   # salva screenshot só da primeira rota
 
     def _accept_cookies(self, page):
         if self._cookies_done:
             return
-        for label in ["Aceitar tudo", "Accept all", "Concordar com tudo", "Tout accepter"]:
+        for label in ["Aceitar tudo", "Accept all", "Concordar com tudo",
+                       "Tout accepter", "Agree to all", "I agree"]:
             try:
                 page.get_by_role("button", name=label).click(timeout=2500)
                 self._cookies_done = True
@@ -178,68 +160,53 @@ class GFlightsScraper:
             except Exception:
                 pass
 
-    def _fill_airport(self, page, nth, code):
-        inputs = page.get_by_role("combobox").all()
-        candidates = inputs[nth:nth+3]
-        for inp in candidates:
-            try:
-                inp.click(timeout=3000)
-                time.sleep(0.4)
-                inp.press("Control+a")
-                inp.type(code, delay=90)
-                time.sleep(1.8)
-                opts = page.get_by_role("option").all()
-                if opts:
-                    opts[0].click()
-                    time.sleep(0.6)
-                    return True
-            except Exception:
-                continue
-        return False
-
-    def _set_date(self, page, date_str, field_aria_keywords):
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        formats = [
-            date_str,
-            f"{dt.day}/{dt.month}/{dt.year}",
-            f"{dt.day:02d}/{dt.month:02d}/{dt.year}",
-            f"{dt.day} de {MONTHS_LONG[dt.month]} de {dt.year}",
+    def _try_fill(self, page, code):
+        """
+        Tenta preencher um campo de aeroporto de várias formas.
+        Retorna True se conseguiu confirmar uma opção no autocomplete.
+        """
+        # Lista de seletores a tentar — do mais específico ao mais genérico
+        selectors = [
+            # Por placeholder (mais estável)
+            'input[placeholder*="De onde"]',
+            'input[placeholder*="Where from"]',
+            'input[placeholder*="Para onde"]',
+            'input[placeholder*="Where to"]',
+            'input[placeholder*="Origem"]',
+            'input[placeholder*="Destino"]',
+            # Por aria-label
+            'input[aria-label*="De onde"]',
+            'input[aria-label*="Where from"]',
+            'input[aria-label*="Para onde"]',
+            'input[aria-label*="Where to"]',
+            # Genérico: qualquer input de texto visível
+            'input[type="text"]:visible',
         ]
-        selectors = []
-        for kw in field_aria_keywords:
-            selectors.append(f'input[aria-label*="{kw}"]')
-            selectors.append(f'[aria-label*="{kw}"]')
 
-        field = None
         for sel in selectors:
             try:
-                el = page.locator(sel).first
-                el.wait_for(timeout=3000)
-                field = el
-                break
+                els = page.locator(sel).all()
+                for el in els:
+                    try:
+                        el.click(timeout=2000)
+                        time.sleep(0.4)
+                        el.press("Control+a")
+                        el.type(code, delay=90)
+                        time.sleep(2.0)
+                        opts = page.get_by_role("option").all()
+                        if opts:
+                            opts[0].click()
+                            time.sleep(0.7)
+                            return True
+                    except Exception:
+                        continue
             except Exception:
                 continue
-
-        if not field:
-            return False
-
-        for fmt in formats:
-            try:
-                field.click(timeout=3000)
-                time.sleep(0.5)
-                field.press("Control+a")
-                field.type(fmt, delay=60)
-                time.sleep(0.5)
-                field.press("Enter")
-                time.sleep(0.8)
-                return True
-            except Exception:
-                pass
         return False
 
     def search(self, origin, dest, dep_date, ret_date):
         page = self.ctx.new_page()
-        page.set_default_timeout(18000)
+        page.set_default_timeout(20000)
         try:
             return self._search(page, origin, dest, dep_date, ret_date)
         except Exception as e:
@@ -254,52 +221,83 @@ class GFlightsScraper:
             wait_until="domcontentloaded",
             timeout=30000,
         )
-        time.sleep(random.uniform(2, 3))
+        time.sleep(random.uniform(3, 5))
         self._accept_cookies(page)
-        time.sleep(0.8)
+        time.sleep(1)
 
+        # Screenshot de diagnóstico (só na primeira rota)
+        if not self._debug_done:
+            try:
+                page.screenshot(path="debug_page.png", full_page=True)
+                print("    [debug] screenshot salvo em debug_page.png")
+            except Exception as e:
+                print(f"    [debug screenshot erro] {e}")
+            self._debug_done = True
+
+        # Imprimir texto da página para diagnóstico
         try:
-            sel = page.get_by_role("combobox").first
-            txt = sel.inner_text(timeout=2000)
-            if "somente" in txt.lower() or "one" in txt.lower():
-                sel.click()
-                time.sleep(0.4)
-                page.get_by_role("option").filter(
-                    has_text=re.compile(r"ida e volta|round", re.I)
-                ).first.click()
-                time.sleep(0.5)
+            body = page.inner_text("body")
+            preview = body[:300].replace("\n", " ")
+            print(f"    [página] {preview}...")
         except Exception:
             pass
 
-        ok = self._fill_airport(page, 1, origin)
-        if not ok:
-            ok = self._fill_airport(page, 0, origin)
-        if not ok:
+        # Preencher origem
+        print(f"    preenchendo origem: {origin}")
+        if not self._try_fill(page, origin):
             print(f"    [origem falhou]")
             return None, "—"
 
-        ok = self._fill_airport(page, 2, dest)
-        if not ok:
-            ok = self._fill_airport(page, 1, dest)
-        if not ok:
+        # Preencher destino
+        print(f"    preenchendo destino: {dest}")
+        if not self._try_fill(page, dest):
             print(f"    [destino falhou]")
             return None, "—"
 
-        self._set_date(page, dep_date,
-                       ["Partida", "Departure", "Data de partida", "Check-in"])
-        self._set_date(page, ret_date,
-                       ["Volta", "Return", "Data de volta", "Check-out"])
+        # Datas — tenta preencher via aria-label
+        dep_dt = datetime.strptime(dep_date, "%Y-%m-%d")
+        ret_dt = datetime.strptime(ret_date, "%Y-%m-%d")
 
-        for btn_name in ["Pesquisar", "Search", "Buscar"]:
+        for date_str, keywords in [
+            (dep_date, ["Partida","Departure","Data de partida","Data ida"]),
+            (ret_date, ["Volta","Return","Data de volta","Data volta"]),
+        ]:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            formats = [
+                date_str,
+                f"{dt.day}/{dt.month}/{dt.year}",
+                f"{dt.day:02d}/{dt.month:02d}/{dt.year}",
+            ]
+            for kw in keywords:
+                for sel in [f'input[aria-label*="{kw}"]', f'[aria-label*="{kw}"]']:
+                    try:
+                        el = page.locator(sel).first
+                        el.wait_for(timeout=2000)
+                        for fmt in formats:
+                            try:
+                                el.click(timeout=2000)
+                                el.press("Control+a")
+                                el.type(fmt, delay=60)
+                                el.press("Enter")
+                                time.sleep(0.8)
+                                break
+                            except Exception:
+                                pass
+                        break
+                    except Exception:
+                        pass
+
+        # Pesquisar
+        for btn in ["Pesquisar", "Search", "Buscar"]:
             try:
-                page.get_by_role("button", name=btn_name).click(timeout=3000)
+                page.get_by_role("button", name=btn).click(timeout=3000)
                 break
             except Exception:
                 pass
         else:
             page.keyboard.press("Enter")
 
-        time.sleep(random.uniform(6, 10))
+        time.sleep(random.uniform(7, 11))
         try:
             page.wait_for_load_state("networkidle", timeout=15000)
         except Exception:
@@ -307,9 +305,8 @@ class GFlightsScraper:
         time.sleep(2)
 
         body_text = page.inner_text("body")
-
         if "captcha" in body_text.lower() or "não sou um robô" in body_text.lower():
-            print("    [CAPTCHA — pulando]")
+            print("    [CAPTCHA detectado]")
             return None, "—"
 
         prices = parse_brl_prices(body_text)
@@ -336,7 +333,6 @@ def main():
 
     print(f"  Ida: {dep_date}  |  Volta: {ret_date}")
 
-    # Carregar histórico do arquivo local (persistido via git)
     history_path = os.path.join(OUTPUT_DIR, "history.json")
     data_path    = os.path.join(OUTPUT_DIR, "data.json")
     history = load_json(history_path, default={})
@@ -349,10 +345,7 @@ def main():
 
         for route in ROUTES:
             print(f"  → {route['id']}  {route['from_city']} → {route['to_city']}")
-
-            price, airline = scraper.search(
-                route["origin"], route["dest"], dep_date, ret_date
-            )
+            price, airline = scraper.search(route["origin"], route["dest"], dep_date, ret_date)
 
             if price is None:
                 print(f"     sem resultado")
@@ -388,10 +381,8 @@ def main():
                 icon = "🚨 POSSÍVEL ERRO DE TARIFA" if status == "error" else "🔥 PROMOÇÃO EXCEPCIONAL"
                 alerts.append(
                     f"{icon}\n\n✈️ <b>{route['from_city']} → {route['to_city']}</b>\n\n"
-                    f"💰 Preço: <b>R$ {price:,.0f}</b>\n"
-                    f"📊 Mediana 30d: R$ {median:,.0f}\n"
-                    f"📉 Variação: <b>{pct:+.0f}%</b>\n"
-                    f"🏢 Cia: {airline}\n"
+                    f"💰 Preço: <b>R$ {price:,.0f}</b>\n📊 Mediana 30d: R$ {median:,.0f}\n"
+                    f"📉 Variação: <b>{pct:+.0f}%</b>\n🏢 Cia: {airline}\n"
                     f"📅 Ida: {fmt_date(dep_date)}  |  Volta: {fmt_date(ret_date)}\n\n"
                     f"🔗 <a href='{link}'>Ver no Kayak</a>"
                 )
@@ -401,7 +392,6 @@ def main():
         scraper.close()
 
     results.sort(key=lambda r: r["pct_change"] if r["status"] != "new" else 999)
-
     payload = {
         "updated_at":  datetime.utcnow().isoformat() + "Z",
         "updated_fmt": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -409,7 +399,6 @@ def main():
         "routes":      results,
     }
 
-    # Salvar localmente — o GitHub Actions vai commitar de volta ao repo
     save_json(data_path,    payload)
     save_json(history_path, history)
     print(f"✓ {len(results)} rotas salvas em {OUTPUT_DIR}/")
