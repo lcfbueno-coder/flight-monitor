@@ -173,30 +173,27 @@ class GFlightsScraper:
         time.sleep(0.8)
 
         # ── 2. ORIGEM ────────────────────────────────────────────────────────
-        # O campo "De onde?" pode ser input ou div contenteditable.
-        # Seletores baseados no que o screenshot mostrou.
+        # Clicar diretamente no texto "De onde?" visível na tela
         origin_clicked = False
-        for sel in [
-            '[placeholder="De onde?"]',
-            '[placeholder*="De onde"]',
-            '[aria-label*="De onde"]',
-            '[placeholder*="Where from"]',
-            '[aria-label*="Where from"]',
-        ]:
+        for text in ["De onde?", "Where from?", "De onde", "Where from"]:
             try:
-                el = page.locator(sel).first
-                el.wait_for(state="visible", timeout=2000)
-                el.click()
+                page.get_by_text(text, exact=True).first.click(timeout=4000)
                 time.sleep(0.5)
-                # Limpar qualquer conteúdo anterior
-                el.press("Control+a")
-                el.press("Backspace")
-                time.sleep(0.3)
                 origin_clicked = True
-                print(f"    campo origem encontrado: {sel}")
+                print(f"    campo origem clicado via texto '{text}'")
                 break
             except Exception:
-                continue
+                pass
+
+        if not origin_clicked:
+            # Fallback: clicar na área esquerda do formulário por coordenada relativa
+            try:
+                page.mouse.click(350, 383)
+                time.sleep(0.5)
+                origin_clicked = True
+                print(f"    campo origem clicado via coordenada")
+            except Exception:
+                pass
 
         if not origin_clicked:
             print(f"    [campo origem não encontrado]")
@@ -206,36 +203,32 @@ class GFlightsScraper:
         print(f"    origem '{origin}' digitada")
 
         # ── 3. DESTINO ───────────────────────────────────────────────────────
-        # Após confirmar origem, o Google Flights move o foco para o destino.
-        # Verificamos se o foco está em "Para onde?" antes de digitar.
+        # Após confirmar origem, Google Flights move foco para destino.
+        # Tentamos clicar no texto "Para onde?" antes de digitar.
         time.sleep(0.5)
-
-        # Tenta clicar explicitamente no campo de destino
         dest_clicked = False
-        for sel in [
-            '[placeholder="Para onde?"]',
-            '[placeholder*="Para onde"]',
-            '[aria-label*="Para onde"]',
-            '[placeholder*="Where to"]',
-            '[aria-label*="Where to"]',
-        ]:
+        for text in ["Para onde?", "Where to?", "Para onde", "Where to"]:
             try:
-                el = page.locator(sel).first
-                el.wait_for(state="visible", timeout=3000)
-                el.click()
+                page.get_by_text(text, exact=True).first.click(timeout=3000)
                 time.sleep(0.5)
-                el.press("Control+a")
-                el.press("Backspace")
-                time.sleep(0.3)
                 dest_clicked = True
-                print(f"    campo destino encontrado: {sel}")
+                print(f"    campo destino clicado via texto '{text}'")
                 break
             except Exception:
-                continue
+                pass
 
         if not dest_clicked:
-            # Fallback: digitar direto (foco automático do Google)
-            print(f"    destino via foco automático")
+            # Fallback coordenada: lado direito do formulário
+            try:
+                page.mouse.click(650, 383)
+                time.sleep(0.5)
+                dest_clicked = True
+                print(f"    campo destino clicado via coordenada")
+            except Exception:
+                pass
+
+        if not dest_clicked:
+            print(f"    destino via foco automático (sem clique)")
 
         self._type_and_confirm(page, dest)
         print(f"    destino '{dest}' digitado")
