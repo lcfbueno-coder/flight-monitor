@@ -12,7 +12,7 @@ jobs:
   search:
     name: Buscar preços e publicar painel
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -39,12 +39,12 @@ jobs:
           OUTPUT_DIR:       docs
         run: python search.py
 
-      - name: Salvar screenshot de diagnóstico
+      - name: Salvar screenshots de diagnóstico
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-screenshot
-          path: debug_page.png
+          name: debug-screenshots
+          path: "*.png"
           if-no-files-found: ignore
 
       - name: Commitar dados atualizados
