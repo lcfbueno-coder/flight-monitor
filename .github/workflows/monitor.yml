@@ -2,11 +2,11 @@ name: Flight Monitor
 
 on:
   schedule:
-    - cron: '0 15 * * *'   # 12h BRT (15h UTC)
+    - cron: '0 15 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write           # necessário para commitar de volta ao repo
+  contents: write
 
 jobs:
   search:
@@ -38,6 +38,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           OUTPUT_DIR:       docs
         run: python search.py
+
+      - name: Salvar screenshot de diagnóstico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshot
+          path: debug_page.png
+          if-no-files-found: ignore
 
       - name: Commitar dados atualizados
         run: |
