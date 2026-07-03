@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Flights">
+<meta name="theme-color" content="#06061a">
+<title>✈ Flight Monitor</title>
+<link rel="manifest" href="manifest.json">
+
+<style>
+/* ── Tokens ───────────────────────────────────────────── */
+:root {
+  --bg:         #06061a;
+  --surface:    #0c0c26;
+  --surface2:   #12122e;
+  --border:     #1c1c3c;
+  --border2:    #242444;
+  --text:       #dcdcf0;
+  --dim:        #6868a0;
+  --muted:      #30305a;
+  --accent:     #4d6fff;
+  --accent-dim: #1e2966;
+
+  --error:  #ff4757;
+  --fire:   #ff9f43;
+  --good:   #26de81;
+  --normal: #3c3c6a;
+  --high:   #444466;
+  --new:    #5050a0;
+
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", "Courier New", monospace;
+  --font-ui:   system-ui, -apple-system, sans-serif;
+
+  --r: 6px;
+}
+
+/* ── Reset ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────── */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.brand-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.brand-sub {
+  font-size: 0.62rem;
+  color: var(--dim);
+  letter-spacing: 0.08em;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+
+.pulse {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #26de81;
+  flex-shrink: 0;
+  animation: blink 2.4s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(38,222,129,0.5); }
+  50%       { opacity: 0.4; box-shadow: 0 0 0 4px rgba(38,222,129,0); }
+}
+
+/* ── Alert strip ──────────────────────────────────────── */
+#alert-strip {
+  display: none;
+  background: linear-gradient(135deg, rgba(255,71,87,0.12), rgba(255,71,87,0.06));
+  border-bottom: 1px solid rgba(255,71,87,0.3);
+  color: #ff8f9a;
+  padding: 9px 18px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  animation: alertglow 2.5s ease-in-out infinite;
+}
+@keyframes alertglow {
+  0%, 100% { border-color: rgba(255,71,87,0.3); }
+  50%       { border-color: rgba(255,71,87,0.7); }
+}
+
+/* ── Scan line (signature animation on refresh) ──────── */
+#scan-line {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+  transform: translateY(-4px);
+  transition: none;
+}
+#scan-line.scanning {
+  animation: scan 0.7s ease-out forwards;
+}
+@keyframes scan {
+  0%   { opacity: 0;   transform: translateY(0); }
+  20%  { opacity: 1;   transform: translateY(0); }
+  100% { opacity: 0;   transform: translateY(100vh); }
+}
+
+/* ── Table chrome ─────────────────────────────────────── */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+thead th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface);
+  border-bottom: 2px solid var(--border2);
+  white-space: nowrap;
+  position: sticky;
+  top: 57px;
+  z-index: 10;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+tbody tr:hover { background: var(--surface2); }
+
+/* Status left-border */
+tbody tr.error  { border-left: 3px solid var(--error); }
+tbody tr.fire   { border-left: 3px solid var(--fire);  }
+tbody tr.good   { border-left: 3px solid var(--good);  }
+tbody tr.normal { border-left: 3px solid transparent;  }
+tbody tr.high   { border-left: 3px solid transparent;  }
+tbody tr.new    { border-left: 3px solid var(--new);   }
+
+tbody td {
+  padding: 11px 10px;
+  vertical-align: middle;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* ── Cell styles ──────────────────────────────────────── */
+.cell-route .route-main {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.cell-route .route-iata {
+  font-size: 0.62rem;
+  color: var(--muted);
+  margin-top: 2px;
+  letter-spacing: 0.06em;
+}
+
+.cell-airline { color: var(--dim); font-size: 0.76rem; }
+
+.cell-price {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+tr.error  .cell-price { color: var(--error); }
+tr.fire   .cell-price { color: var(--fire);  }
+tr.good   .cell-price { color: var(--good);  }
+tr.normal .cell-price { color: var(--text);  }
+tr.high   .cell-price { color: var(--dim);   }
+tr.new    .cell-price { color: var(--text);  }
+
+.cell-date { color: var(--dim); font-size: 0.78rem; }
+
+.cell-avg { color: var(--muted); font-size: 0.75rem; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.badge.b-error  { background: rgba(255,71,87,0.15);  color: var(--error); }
+.badge.b-fire   { background: rgba(255,159,67,0.15); color: var(--fire);  }
+.badge.b-good   { background: rgba(38,222,129,0.12); color: var(--good);  }
+.badge.b-normal { background: transparent; color: var(--muted); }
+.badge.b-high   { background: transparent; color: var(--high);  }
+.badge.b-new    { background: rgba(80,80,160,0.15); color: var(--new); }
+
+.cell-link a {
+  display: inline-block;
+  padding: 5px 8px;
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--r);
+  color: var(--accent);
+  font-size: 0.7rem;
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  transition: background 0.12s, border-color 0.12s;
+}
+.cell-link a:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+/* ── Footer / legend ──────────────────────────────────── */
+footer {
+  padding: 16px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+footer span { display: flex; align-items: center; gap: 5px; }
+footer i {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+}
+
+/* ── Empty / loading ──────────────────────────────────── */
+.state-row td {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  cursor: default;
+}
+
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (max-width: 680px) {
+  .hide-mobile { display: none; }
+  table { min-width: 480px; }
+  thead th, tbody td { padding: 9px 7px; }
+}
+</style>
+</head>
+<body>
+
+<div id="scan-line"></div>
+
+<header>
+  <div class="brand">
+    <span class="brand-title">✈ Flight Monitor</span>
+    <span class="brand-sub" id="update-time">carregando…</span>
+  </div>
+  <div class="live-badge">
+    <span class="pulse"></span>
+    <span id="live-label">live</span>
+  </div>
+</header>
+
+<div id="alert-strip"></div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Rota</th>
+        <th class="hide-mobile">Cia aérea</th>
+        <th>Melhor preço</th>
+        <th>Ida</th>
+        <th>Volta</th>
+        <th class="hide-mobile">Média 30d</th>
+        <th>Variação</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody id="board">
+      <tr class="state-row">
+        <td colspan="8">
+          <span class="spinner"></span> buscando tarifas…
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  <span><i style="background:var(--error)"></i> erro de tarifa (&lt;−50%)</span>
+  <span><i style="background:var(--fire)"></i> promoção excepcional (−30 a −50%)</span>
+  <span><i style="background:var(--good)"></i> bom preço (−10 a −30%)</span>
+  <span><i style="background:var(--muted)"></i> preço normal</span>
+  <span><i style="background:var(--new)"></i> histórico insuficiente</span>
+</footer>
+
+<script>
+const DATA_URL = 'data.json';
+const REFRESH_MS = 5 * 60 * 1000; // atualiza o JSON a cada 5 min
+
+function fmt(n) {
+  return 'R$ ' + Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+}
+
+function badge(status, pct, n) {
+  if (status === 'new') return `<span class="badge b-new">— novo</span>`;
+  const sign = pct > 0 ? '+' : '';
+  const icons = { error: '🚨', fire: '🔥', good: '✅', normal: '—', high: '↑' };
+  const icon = icons[status] || '—';
+  return `<span class="badge b-${status}">${icon} ${sign}${pct.toFixed(0)}%</span>`;
+}
+
+function triggerScan() {
+  const el = document.getElementById('scan-line');
+  el.classList.remove('scanning');
+  void el.offsetWidth; // reflow
+  el.classList.add('scanning');
+}
+
+function renderBoard(data) {
+  const board = document.getElementById('board');
+  const alertEl = document.getElementById('alert-strip');
+  const timeEl = document.getElementById('update-time');
+
+  timeEl.textContent = `atualizado ${data.updated_fmt}`;
+
+  const hotRoutes = data.routes.filter(r => r.status === 'error' || r.status === 'fire');
+  if (hotRoutes.length) {
+    alertEl.style.display = 'block';
+    alertEl.innerHTML = '🚨 ' + hotRoutes.map(r =>
+      `<b>${r.from} → ${r.to}</b> (${r.pct_change > 0 ? '+' : ''}${r.pct_change.toFixed(0)}%)`
+    ).join(' &nbsp;·&nbsp; ');
+  } else {
+    alertEl.style.display = 'none';
+  }
+
+  if (!data.routes || data.routes.length === 0) {
+    board.innerHTML = '<tr class="state-row"><td colspan="8">Nenhuma rota disponível.</td></tr>';
+    return;
+  }
+
+  board.innerHTML = data.routes.map(r => `
+    <tr class="${r.status}" onclick="window.open('${r.link}', '_blank')">
+      <td class="cell-route">
+        <div class="route-main">${r.flag} ${r.from} → ${r.to}</div>
+        <div class="route-iata">${r.origin} → ${r.dest}</div>
+      </td>
+      <td class="cell-airline hide-mobile">${r.airline}</td>
+      <td class="cell-price">${fmt(r.price)}</td>
+      <td class="cell-date">${r.dep_fmt}</td>
+      <td class="cell-date">${r.ret_fmt}</td>
+      <td class="cell-avg hide-mobile">${fmt(r.median_30d)}</td>
+      <td>${badge(r.status, r.pct_change, r.n_points)}</td>
+      <td class="cell-link" onclick="event.stopPropagation()">
+        <a href="${r.link}" target="_blank" rel="noopener">Kayak →</a>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(DATA_URL + '?_=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    triggerScan();
+    renderBoard(data);
+    document.getElementById('live-label').textContent = 'live';
+  } catch (e) {
+    document.getElementById('update-time').textContent = 'erro ao carregar';
+    document.getElementById('live-label').textContent = 'offline';
+    console.error(e);
+  }
+}
+
+loadData();
+setInterval(loadData, REFRESH_MS);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
