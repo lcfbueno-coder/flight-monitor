@@ -20,8 +20,7 @@ TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # Pasta de saída local (dentro do repositório, servida pelo GitHub Pages)
-OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "public")
-
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "docs")
 # ─── Configuração ─────────────────────────────────────────────────────────────
 TRIP_DURATION      = 10   # dias de estadia padrão
 SEARCH_OFFSET      = 45   # busca voos com X dias de antecedência
