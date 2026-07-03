@@ -1,0 +1,38 @@
+name: Flight Monitor
+
+on:
+  schedule:
+    - cron: '0 15 * * *'   # 12h BRT (15h UTC)
+  workflow_dispatch:         # permite rodar manualmente
+
+jobs:
+  search:
+    name: Buscar preços e publicar painel
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependências Python
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium + dependências do sistema
+        run: playwright install chromium --with-deps
+
+      - name: Buscar preços
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FTP_HOST:         ${{ secrets.FTP_HOST }}
+          FTP_USER:         ${{ secrets.FTP_USER }}
+          FTP_PASS:         ${{ secrets.FTP_PASS }}
+          FTP_PATH:         ${{ secrets.FTP_PATH }}
+        run: python search.py
