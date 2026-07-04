@@ -175,7 +175,11 @@ header {
 }
 
 /* ── Table chrome ─────────────────────────────────────── */
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap {
+  overflow: auto;
+  max-height: calc(100dvh - var(--chrome-h, 118px));
+  -webkit-overflow-scrolling: touch;
+}
 
 table {
   width: 100%;
@@ -194,7 +198,7 @@ thead th {
   border-bottom: 2px solid var(--border2);
   white-space: nowrap;
   position: sticky;
-  top: var(--header-h, 57px);
+  top: 0;
   z-index: 10;
 }
 
@@ -440,9 +444,10 @@ document.getElementById('sort-toggle').addEventListener('click', e => {
 // ── Altura real do header → offset do thead sticky ────
 function syncHeaderOffset() {
   const h = document.querySelector('header');
-  if (h) {
-    document.documentElement.style.setProperty('--header-h', h.offsetHeight + 'px');
-  }
+  const a = document.getElementById('alert-strip');
+  let total = h ? h.offsetHeight : 0;
+  if (a && a.style.display === 'block') total += a.offsetHeight;
+  document.documentElement.style.setProperty('--chrome-h', total + 'px');
 }
 window.addEventListener('resize', syncHeaderOffset);
 syncHeaderOffset();
