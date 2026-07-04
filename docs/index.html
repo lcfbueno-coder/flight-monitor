@@ -346,6 +346,7 @@ footer i {
 </div>
 
 <footer>
+  <span id="scope-note" style="color:var(--dim)"></span>
   <span><i style="background:var(--error)"></i> erro de tarifa (&lt;−50%)</span>
   <span><i style="background:var(--fire)"></i> promoção excepcional (−30 a −50%)</span>
   <span><i style="background:var(--good)"></i> bom preço (−10 a −30%)</span>
@@ -388,6 +389,12 @@ function renderBoard(data) {
 
   timeEl.textContent = `atualizado ${data.updated_fmt}`;
 
+  const scope = document.getElementById('scope-note');
+  if (scope && data.window_days) {
+    const durs = (data.durations || []).join('/');
+    scope.textContent = `menor tarifa dos próximos ${data.window_days} dias · viagens de ${durs} dias`;
+  }
+
   const hotRoutes = (data.routes || []).filter(r => r.status === 'error' || r.status === 'fire');
   if (hotRoutes.length) {
     alertEl.style.display = 'block';
@@ -407,7 +414,7 @@ function renderBoard(data) {
     <tr class="${esc(r.status)}" data-link="${esc(r.link)}">
       <td class="cell-route">
         <div class="route-main">${esc(r.flag)} ${esc(r.from)} → ${esc(r.to)}</div>
-        <div class="route-iata">${esc(r.origin)} → ${esc(r.dest)}</div>
+        <div class="route-iata">${esc(r.origin)} → ${esc(r.dest)}${r.duration ? ' · ' + Number(r.duration) + ' dias' : ''}</div>
       </td>
       <td class="cell-airline hide-mobile">${esc(r.airline)}</td>
       <td class="cell-price">${fmt(r.price)}</td>
