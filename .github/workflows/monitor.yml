@@ -2,35 +2,51 @@ name: Flight Monitor
 
 on:
   schedule:
-    - cron: '0 15 * * *'
+    # Horários em UTC. Brasília = UTC−3:
+    - cron: '0 10 * * *'   # 07:00 em Brasília
+    - cron: '0 22 * * *'   # 19:00 em Brasília
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# Nunca deixa duas rodadas escreverem no repositório ao mesmo tempo
+concurrency:
+  group: flight-monitor
+  cancel-in-progress: false
+
 jobs:
   search:
     name: Buscar preços e publicar painel
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Python 3.11
+      - name: Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Instalar dependências Python
         run: pip install -r requirements.txt
 
-      - name: Instalar Chromium + dependências do sistema
+      - name: Cache do Chromium (Playwright)
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Instalar Chromium + dependências de sistema
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: playwright install chromium --with-deps
+
+      - name: Dependências de sistema (Chromium já em cache)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
 
       - name: Buscar preços
         env:
@@ -46,11 +62,17 @@ jobs:
           name: debug-screenshots
           path: "*.png"
           if-no-files-found: ignore
+          retention-days: 5
 
       - name: Commitar dados atualizados
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/data.json docs/history.json
-          git diff --staged --quiet || git commit -m "📊 Atualiza preços $(date -u +'%d/%m/%Y %H:%M UTC')"
+          if git diff --staged --quiet; then
+            echo "Nada a commitar"
+            exit 0
+          fi
+          git commit -m "📊 Atualiza preços $(date -u +'%d/%m/%Y %H:%M UTC')"
+          git pull --rebase origin main
           git push
