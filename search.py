@@ -1,21 +1,21 @@
 """
-Flight Price Monitor — v3 (Playwright / Google Flights)
+Flight Price Monitor — v3.1 (Playwright / Google Flights)
 
-Mudança central em relação à v2:
-  • Em vez de monitorar UMA data fixa (D+45 → D+55), o script agora abre o
-    CALENDÁRIO DE PREÇOS do Google Flights (o mesmo painel que mostra o menor
-    preço por dia) e varre os próximos 90 dias, para viagens com a duração
-    definida em TRIP_DURATIONS. O painel passa a mostrar a MENOR tarifa do
-    trimestre por rota, com as datas exatas em que ela ocorre.
-  • Antes de disparar alerta 🔥/🚨, o preço do calendário é VERIFICADO na
-    página de resultados real (calendário é estimativa e pode estar defasado).
-  • Se o calendário falhar numa rota, o script degrada para o modo antigo
-    (busca em data fixa na âncora D+10) — o painel nunca fica vazio.
-
-Mantido da v2: URL direta ?q= (sem digitação), cookie SOCS=CAI (pula
-consentimento), extração por resultado, mediana só com dias anteriores,
-menor preço do dia no histórico, retry, screenshots de debug, aviso de
-falha em massa no Telegram, horários em America/Sao_Paulo.
+Correções sobre a v3 (que caiu em fallback em 100% das rotas):
+  • A detecção do calendário deixou de depender de estrutura ([role=dialog]
+    visível — o Google pré-renderiza dialogs OCULTOS e o teste pegava o
+    primeiro deles). Agora o teste é por DADOS: clicou → apareceram preços
+    por dia em qualquer lugar da página → calendário aberto.
+  • Parser do calendário em 3 camadas: (1) aria-label com data+preço;
+    (2) aria-label com data + preço no texto da célula; (3) célula
+    "dia\npreço" com o mês vindo da própria grade.
+  • Extração de resultados por <li> coletados via JavaScript
+    (independe de roles de acessibilidade, que não estavam casando).
+  • Âncora do fallback em data fixa: D+45 (não mais D+10 — tarifa de
+    última hora inflava os preços). Janela do calendário: D+30 a D+90.
+  • Diagnóstico que dispara NA FALHA: se o calendário não abrir, salva
+    screenshot + HTML da página (debug_calendar_fail.*). A primeira rota
+    também salva sempre debug_results.* para calibração.
 """
 
 import re
@@ -40,9 +40,10 @@ OUTPUT_DIR       = os.environ.get("OUTPUT_DIR", "docs")
 # Durações de viagem a testar (dias). Para testar também 21 dias:
 # TRIP_DURATIONS = [15, 21]  → dobra o nº de páginas por rodada.
 TRIP_DURATIONS     = [15]
-SEARCH_WINDOW      = 90        # varre a menor tarifa dos próximos N dias
-ANCHOR_OFFSET      = 10        # data âncora da URL (o calendário abre perto de hoje)
-CAL_MONTH_CLICKS   = 2         # avanços de mês no calendário (2 → cobre ~3 meses)
+MIN_DEP_OFFSET     = 30        # só considera partidas a partir de D+30...
+SEARCH_WINDOW      = 90        # ...até D+90
+ANCHOR_OFFSET      = 45        # âncora da URL (o fallback fixo também usa)
+CAL_MONTH_CLICKS   = 1         # avanços de mês no calendário
 MIN_POINTS_FOR_PCT = 5         # dias ANTERIORES mínimos p/ calcular variação
 RETRIES_PER_ROUTE  = 2
 DELAY_BETWEEN      = (5, 8)    # pausa entre rotas (s)
@@ -118,16 +119,45 @@ ROUTES = [
 
 PRICE_RE = re.compile(r'R\$\s*([\d]{1,3}(?:\.[\d]{3})*)')
 
-# aria-labels do calendário: "R$ 4.770, sábado, 3 de agosto de 2026"
-# ou "3 de agosto de 2026, 4.770 Reais brasileiros" (com/sem ano)
+_MONTHS_ALT = '|'.join(MONTHS_FULL.keys())
+
+# "3 de agosto de 2026" / "3 de agosto" / "3 August 2026"
 CAL_DATE_RE = re.compile(
-    r'(\d{1,2})\s+(?:de\s+)?(' + '|'.join(MONTHS_FULL.keys()) + r')(?:\s+(?:de\s+)?(\d{4}))?',
+    r'(?<!\d)(\d{1,2})\s+(?:de\s+)?\b(' + _MONTHS_ALT + r')\b(?:\s+(?:de\s+)?(\d{4}))?',
     re.I,
 )
+# "agosto de 2026" (cabeçalho/aria-label da grade do mês)
+MONTH_WORD_RE = re.compile(
+    r'\b(' + _MONTHS_ALT + r')\b(?:\s+(?:de\s+)?(\d{4}))?', re.I,
+)
+# "R$ 4.770" ou "4.770 reais"
 CAL_PRICE_RE = re.compile(
     r'R\$\s*([\d]{1,3}(?:\.[\d]{3})*)|([\d]{1,3}(?:\.[\d]{3})*)\s*reais',
     re.I,
 )
+# célula do calendário: "3\n4.770"
+CELL_TEXT_RE = re.compile(
+    r'^\s*(\d{1,2})\s*[\n\r]+\s*R?\$?\s*([\d]{1,3}(?:\.[\d]{3})*)\s*$',
+)
+ANY_NUMBER_RE = re.compile(r'([\d]{1,3}(?:\.[\d]{3})*)')
+
+# Coleta página inteira: aria-labels + células de grade com o mês do contexto
+COLLECT_JS = """
+() => {
+  const out = [];
+  document.querySelectorAll('[aria-label]').forEach(e => {
+    out.push({l: e.getAttribute('aria-label'), t: null, m: null});
+  });
+  document.querySelectorAll('[role="grid"]').forEach(g => {
+    const cap = g.querySelector('caption');
+    const m = g.getAttribute('aria-label') || (cap ? cap.innerText : null);
+    g.querySelectorAll('[role="gridcell"], [role="button"], td').forEach(c => {
+      out.push({l: c.getAttribute('aria-label'), t: c.innerText, m: m});
+    });
+  });
+  return out;
+}
+"""
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -143,36 +173,80 @@ def parse_brl_prices(text, min_p):
     return prices
 
 
-def parse_calendar_labels(labels, today, window_end):
-    """Extrai {date: menor_preço} dos aria-labels do calendário de preços."""
+def _mk_date(day, month, year):
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def parse_calendar_entries(entries, today, window_start, window_end):
+    """Extrai {date: menor_preço} da coleta da página (3 camadas de parse)."""
     found = {}
-    for label in labels:
-        if not label:
-            continue
-        dm = CAL_DATE_RE.search(label)
-        pm = CAL_PRICE_RE.search(label)
-        if not (dm and pm):
-            continue
-        try:
-            day   = int(dm.group(1))
-            month = MONTHS_FULL[dm.group(2).lower()]
-            year  = int(dm.group(3)) if dm.group(3) else today.year
-            d = date(year, month, day)
-            if not dm.group(3) and d < today:
-                d = date(year + 1, month, day)
-        except (ValueError, KeyError):
-            continue
-        if not (today < d <= window_end):
-            continue
-        raw = pm.group(1) or pm.group(2)
-        try:
-            price = float(raw.replace('.', ''))
-        except ValueError:
-            continue
+
+    def keep(d, price):
+        if d is None:
+            return
+        if not (window_start <= d <= window_end):
+            return
         if not (MIN_PRICE <= price <= MAX_PRICE):
-            continue
+            return
         if d not in found or price < found[d]:
             found[d] = price
+
+    for e in entries:
+        label = e.get("l") or ""
+        text  = e.get("t") or ""
+        mctx  = e.get("m") or ""
+
+        dm = CAL_DATE_RE.search(label)
+        if dm:
+            day, month = int(dm.group(1)), MONTHS_FULL[dm.group(2).lower()]
+            year = int(dm.group(3)) if dm.group(3) else today.year
+            d = _mk_date(day, month, year)
+            if d and not dm.group(3) and d < today:
+                d = _mk_date(day, month, year + 1)
+
+            # Camada 1: preço no próprio aria-label
+            pm = CAL_PRICE_RE.search(label)
+            if pm:
+                raw = pm.group(1) or pm.group(2)
+                try:
+                    keep(d, float(raw.replace('.', '')))
+                except ValueError:
+                    pass
+                continue
+
+            # Camada 2: data no aria-label, preço no texto da célula
+            if text:
+                cands = []
+                for x in ANY_NUMBER_RE.findall(text):
+                    try:
+                        v = float(x.replace('.', ''))
+                    except ValueError:
+                        continue
+                    if MIN_PRICE <= v <= MAX_PRICE:
+                        cands.append(v)
+                if cands:
+                    keep(d, min(cands))
+            continue
+
+        # Camada 3: célula "dia\npreço" com o mês vindo da grade
+        if text and mctx:
+            cm = CELL_TEXT_RE.match(text)
+            mm = MONTH_WORD_RE.search(mctx)
+            if cm and mm:
+                day   = int(cm.group(1))
+                month = MONTHS_FULL[mm.group(1).lower()]
+                year  = int(mm.group(2)) if mm.group(2) else today.year
+                d = _mk_date(day, month, year)
+                if d and not mm.group(2) and d < today:
+                    d = _mk_date(day, month, year + 1)
+                try:
+                    keep(d, float(cm.group(2).replace('.', '')))
+                except ValueError:
+                    pass
+
     return found
 
 
@@ -262,7 +336,6 @@ class GFlightsScraper:
             user_agent=("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
                         "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
         )
-        # SOCS=CAI → pula a tela de consentimento em IPs de datacenter
         self.ctx.add_cookies([{
             "name": "SOCS", "value": "CAI",
             "domain": ".google.com", "path": "/",
@@ -270,9 +343,24 @@ class GFlightsScraper:
         self.ctx.add_init_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
         )
-        self._cal_shot_done = False
+        self._results_dumped  = False
+        self._cal_fail_dumped = False
+        self._cal_ok_dumped   = False
 
-    # ── Consentimento (fallback; o cookie SOCS normalmente já resolve) ──
+    # ── Diagnóstico ──────────────────────────────────────────────────────────
+    @staticmethod
+    def _dump(page, tag):
+        try:
+            page.screenshot(path=f"debug_{tag}.png", full_page=False)
+        except Exception:
+            pass
+        try:
+            with open(f"debug_{tag}.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+            print(f"    [debug] debug_{tag}.png/.html salvos")
+        except Exception:
+            pass
+
     def _dismiss_consent(self, page):
         for label in ["Aceitar tudo", "Accept all", "Recusar tudo", "Reject all"]:
             try:
@@ -282,18 +370,11 @@ class GFlightsScraper:
             except Exception:
                 pass
 
-    @staticmethod
-    def _debug_shot(page, name):
-        try:
-            page.screenshot(path=f"debug_{name}.png", full_page=False)
-            print(f"    [debug] screenshot salvo: debug_{name}.png")
-        except Exception:
-            pass
-
-    # ── Rota completa: calendário de 90 dias, com retry ─────────────────────
+    # ── Rota completa, com retry ─────────────────────────────────────────────
     def search_route(self, origin, dest, today):
         """Retorna dict(price, dep, ret, duration, airline, source) ou None."""
-        window_end = today + timedelta(days=SEARCH_WINDOW)
+        window_start = today + timedelta(days=MIN_DEP_OFFSET)
+        window_end   = today + timedelta(days=SEARCH_WINDOW)
         for attempt in range(1, RETRIES_PER_ROUTE + 1):
             best = None
             for dur in TRIP_DURATIONS:
@@ -301,14 +382,14 @@ class GFlightsScraper:
                 page.set_default_timeout(20000)
                 try:
                     cand = self._scan_duration(page, origin, dest, today,
-                                               window_end, dur)
+                                               window_start, window_end, dur)
                     if cand and (best is None or cand["price"] < best["price"]):
                         best = cand
                 except Exception as e:
                     print(f"    [{dur}d, tentativa {attempt}] "
                           f"{type(e).__name__}: {e}")
                     if attempt == RETRIES_PER_ROUTE:
-                        self._debug_shot(page, f"{origin}-{dest}")
+                        self._dump(page, f"{origin}-{dest}")
                 finally:
                     page.close()
                 if len(TRIP_DURATIONS) > 1:
@@ -319,9 +400,8 @@ class GFlightsScraper:
                 time.sleep(random.uniform(5, 8))
         return None
 
-    def _scan_duration(self, page, origin, dest, today, window_end, dur):
-        # 1. Abrir resultados numa data âncora próxima (o calendário abre
-        #    mostrando os meses a partir de agora)
+    def _scan_duration(self, page, origin, dest, today,
+                       window_start, window_end, dur):
         anchor_dep = today + timedelta(days=ANCHOR_OFFSET)
         anchor_ret = anchor_dep + timedelta(days=dur)
         dep_a, ret_a = anchor_dep.isoformat(), anchor_ret.isoformat()
@@ -343,8 +423,13 @@ class GFlightsScraper:
             return None
         time.sleep(2.0)
 
-        # 2. Calendário de preços: menor tarifa por dia, próximos 90 dias
-        cal = self._scan_calendar(page, today, window_end)
+        # Dump de calibração da página de resultados (primeira rota)
+        if not self._results_dumped:
+            self._dump(page, "results")
+            self._results_dumped = True
+
+        # Calendário: menor tarifa por dia entre D+30 e D+90
+        cal = self._scan_calendar(page, today, window_start, window_end)
         if cal:
             dep_best, price = min(cal.items(), key=lambda kv: kv[1])
             ret_best = dep_best + timedelta(days=dur)
@@ -354,8 +439,8 @@ class GFlightsScraper:
                     "ret": ret_best.isoformat(), "duration": dur,
                     "airline": "—", "source": "calendar"}
 
-        # 3. Fallback: modo antigo — melhor preço na data âncora
-        print("    [calendário indisponível → fallback em data fixa]")
+        # Fallback: melhor preço na data âncora (D+45)
+        print("    [calendário indisponível → fallback em data fixa D+45]")
         price, airline = self._extract_results(page)
         if price is not None:
             return {"price": price, "dep": dep_a, "ret": ret_a,
@@ -363,70 +448,81 @@ class GFlightsScraper:
         return None
 
     # ── Calendário ───────────────────────────────────────────────────────────
-    def _open_price_panel(self, page):
-        openers = [
-            lambda: page.get_by_role("textbox",
-                     name=re.compile("Partida|Departure", re.I)).first,
-            lambda: page.locator('input[aria-label*="Partida"]').first,
-            lambda: page.locator('[aria-label*="Partida"]').first,
-            lambda: page.get_by_role("button",
-                     name=re.compile("Gráfico de preços|Price graph", re.I)).first,
-        ]
-        for get in openers:
-            try:
-                get().click(timeout=2500)
-            except Exception:
-                continue
-            try:
-                dlg = page.locator('[role="dialog"]').first
-                dlg.wait_for(state="visible", timeout=5000)
-                time.sleep(1.5)
-                return dlg
-            except Exception:
-                continue
-        return None
-
-    @staticmethod
-    def _labels(dlg):
+    def _collect(self, page):
         try:
-            return dlg.evaluate(
-                "el => Array.from(el.querySelectorAll('[aria-label]'))"
-                ".map(e => e.getAttribute('aria-label'))"
-            ) or []
+            return page.evaluate(COLLECT_JS) or []
         except Exception:
             return []
 
-    def _scan_calendar(self, page, today, window_end):
-        dlg = self._open_price_panel(page)
-        if dlg is None:
+    def _open_price_panel(self, page, today, window_start, window_end):
+        """Clica em candidatos e valida por DADOS: apareceram preços por dia?"""
+        openers = [
+            'input[aria-label*="Partida" i]:visible',
+            'input[aria-label*="Departure" i]:visible',
+            '[aria-label*="Data de partida" i]:visible',
+            'input[placeholder*="Partida" i]:visible',
+            '[aria-label*="Gráfico de preços" i]:visible',
+            '[aria-label*="Price graph" i]:visible',
+        ]
+        first_click = True
+        for sel in openers:
+            try:
+                page.locator(sel).first.click(timeout=2500)
+            except Exception:
+                continue
+            rounds = 6 if first_click else 3
+            first_click = False
+            for _ in range(rounds):
+                time.sleep(1.4)
+                if parse_calendar_entries(self._collect(page), today,
+                                          window_start, window_end):
+                    print(f"    calendário aberto ({sel.split(':')[0]})")
+                    return True
+        return False
+
+    def _advance_month(self, page):
+        try:
+            btns = page.get_by_role(
+                "button", name=re.compile(r"Próximo|Next", re.I)
+            ).all()
+        except Exception:
+            return False
+        for btn in btns[:6]:
+            try:
+                if btn.is_visible():
+                    btn.click(timeout=1500)
+                    time.sleep(1.8)
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _scan_calendar(self, page, today, window_start, window_end):
+        if not self._open_price_panel(page, today, window_start, window_end):
+            if not self._cal_fail_dumped:
+                self._dump(page, "calendar_fail")
+                self._cal_fail_dumped = True
             print("    [não consegui abrir o calendário]")
             return {}
 
         prices = {}
         for i in range(CAL_MONTH_CLICKS + 1):
             found = {}
-            for _ in range(5):  # espera os preços hidratarem (até ~7s)
-                found = parse_calendar_labels(self._labels(dlg),
-                                              today, window_end)
+            for _ in range(4):
+                found = parse_calendar_entries(self._collect(page), today,
+                                               window_start, window_end)
                 if found:
                     break
-                time.sleep(1.5)
+                time.sleep(1.4)
             for d, p in found.items():
                 if d not in prices or p < prices[d]:
                     prices[d] = p
-            if i < CAL_MONTH_CLICKS:
-                try:
-                    dlg.get_by_role(
-                        "button", name=re.compile(r"Próximo|Next", re.I)
-                    ).first.click(timeout=2500)
-                    time.sleep(1.8)
-                except Exception:
-                    break
+            if i < CAL_MONTH_CLICKS and not self._advance_month(page):
+                break
 
-        # Screenshot de calibração do calendário (uma vez por rodada)
-        if not self._cal_shot_done:
-            self._debug_shot(page, "calendar")
-            self._cal_shot_done = True
+        if prices and not self._cal_ok_dumped:
+            self._dump(page, "calendar_ok")
+            self._cal_ok_dumped = True
 
         try:
             page.keyboard.press("Escape")
@@ -436,34 +532,38 @@ class GFlightsScraper:
         return prices
 
     # ── Extração da lista de resultados (fallback e verificação) ────────────
-    def _extract_results(self, page):
-        # Expandir "Mais voos" (revela tarifas escondidas)
+    def _expand_more(self, page):
+        for sel in ['[aria-label*="Mais voos" i]:visible',
+                    '[aria-label*="More flights" i]:visible']:
+            try:
+                page.locator(sel).first.click(timeout=2000)
+                time.sleep(1.8)
+                return
+            except Exception:
+                pass
         try:
             page.get_by_role(
                 "button",
-                name=re.compile("Mais voos|More flights|Ver mais voos|Show more", re.I),
-            ).first.click(timeout=2500)
+                name=re.compile("Mais voos|More flights|Show more", re.I),
+            ).first.click(timeout=2000)
             time.sleep(1.8)
         except Exception:
             pass
 
-        best_price, best_airline = None, "—"
-        items = []
-        try:
-            main = page.locator('[role="main"]').first
-            items = main.get_by_role("listitem").all()
-        except Exception:
-            pass
-        if not items:
-            try:
-                items = page.get_by_role("listitem").all()
-            except Exception:
-                items = []
+    def _extract_results(self, page):
+        self._expand_more(page)
 
-        for item in items[:60]:
-            try:
-                txt = item.inner_text(timeout=1500)
-            except Exception:
+        best_price, best_airline = None, "—"
+        try:
+            texts = page.evaluate(
+                "() => Array.from(document.querySelectorAll('li'))"
+                ".map(e => e.innerText)"
+            ) or []
+        except Exception:
+            texts = []
+
+        for txt in texts[:150]:
+            if not txt:
                 continue
             found = parse_brl_prices(txt, MIN_PRICE)
             if not found:
@@ -509,10 +609,10 @@ class GFlightsScraper:
 
 def main():
     now_br = datetime.now(TZ_BR)
-    print(f"▶ Flight Monitor v3 — {now_br.strftime('%d/%m/%Y %H:%M')} "
+    print(f"▶ Flight Monitor v3.1 — {now_br.strftime('%d/%m/%Y %H:%M')} "
           f"(horário de Brasília)")
-    print(f"  Janela: {SEARCH_WINDOW} dias  |  "
-          f"Durações: {TRIP_DURATIONS} dias de viagem")
+    print(f"  Janela: partidas de D+{MIN_DEP_OFFSET} a D+{SEARCH_WINDOW}  |  "
+          f"Durações: {TRIP_DURATIONS} dias  |  Âncora fixa: D+{ANCHOR_OFFSET}")
 
     today     = now_br.date()
     today_str = today.strftime("%Y-%m-%d")
@@ -588,7 +688,6 @@ def main():
             print(f"     R$ {price:,.0f} via {airline}  {pct:+.0f}%  "
                   f"[{stat}] ({source}, ida {dep})")
 
-            # get_status já exige MIN_POINTS_FOR_PCT dias anteriores
             if stat in ("error", "fire"):
                 icon = ("🚨 POSSÍVEL ERRO DE TARIFA" if stat == "error"
                         else "🔥 PROMOÇÃO EXCEPCIONAL")
@@ -612,6 +711,7 @@ def main():
         "updated_fmt": datetime.now(TZ_BR).strftime("%d/%m/%Y %H:%M"),
         "total": len(results),
         "failed": failed,
+        "window_start": MIN_DEP_OFFSET,
         "window_days": SEARCH_WINDOW,
         "durations": TRIP_DURATIONS,
         "routes": results,
