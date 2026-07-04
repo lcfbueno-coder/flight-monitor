@@ -167,7 +167,7 @@ thead th {
   border-bottom: 2px solid var(--border2);
   white-space: nowrap;
   position: sticky;
-  top: 57px;
+  top: 0;
   z-index: 10;
 }
 
@@ -451,6 +451,15 @@ async function loadData() {
   }
 }
 
+function updateStickyOffset() {
+  const h = document.querySelector('header').offsetHeight;
+  document.querySelectorAll('thead th').forEach(th => {
+    th.style.top = h + 'px';
+  });
+}
+updateStickyOffset();
+window.addEventListener('resize', updateStickyOffset);
+  
 loadData();
 setInterval(loadData, REFRESH_MS);
 
