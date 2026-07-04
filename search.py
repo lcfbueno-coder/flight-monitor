@@ -63,21 +63,41 @@ KNOWN_AIRLINES = [
 ]
 
 ROUTES = [
-    {"id": "GRU-CUN", "origin": "GRU", "dest": "CUN", "from_city": "São Paulo",     "to_city": "Cancún",       "flag": "🇲🇽"},
-    {"id": "GRU-MIA", "origin": "GRU", "dest": "MIA", "from_city": "São Paulo",     "to_city": "Miami",        "flag": "🇺🇸"},
-    {"id": "GRU-LIS", "origin": "GRU", "dest": "LIS", "from_city": "São Paulo",     "to_city": "Lisboa",       "flag": "🇵🇹"},
-    {"id": "GRU-MAD", "origin": "GRU", "dest": "MAD", "from_city": "São Paulo",     "to_city": "Madri",        "flag": "🇪🇸"},
-    {"id": "GRU-CDG", "origin": "GRU", "dest": "CDG", "from_city": "São Paulo",     "to_city": "Paris",        "flag": "🇫🇷"},
-    {"id": "GRU-FCO", "origin": "GRU", "dest": "FCO", "from_city": "São Paulo",     "to_city": "Roma",         "flag": "🇮🇹"},
-    {"id": "GRU-GVA", "origin": "GRU", "dest": "GVA", "from_city": "São Paulo",     "to_city": "Genebra",      "flag": "🇨🇭"},
-    {"id": "GRU-IST", "origin": "GRU", "dest": "IST", "from_city": "São Paulo",     "to_city": "Istambul",     "flag": "🇹🇷"},
-    {"id": "GRU-CAI", "origin": "GRU", "dest": "CAI", "from_city": "São Paulo",     "to_city": "Cairo",        "flag": "🇪🇬"},
-    {"id": "GRU-DXB", "origin": "GRU", "dest": "DXB", "from_city": "São Paulo",     "to_city": "Dubai",        "flag": "🇦🇪"},
-    {"id": "CWB-SCL", "origin": "CWB", "dest": "SCL", "from_city": "Curitiba",      "to_city": "Santiago",     "flag": "🇨🇱"},
-    {"id": "CWB-EZE", "origin": "CWB", "dest": "EZE", "from_city": "Curitiba",      "to_city": "Buenos Aires", "flag": "🇦🇷"},
-    {"id": "CWB-BRC", "origin": "CWB", "dest": "BRC", "from_city": "Curitiba",      "to_city": "Bariloche",    "flag": "🇦🇷"},
-    {"id": "FLN-EZE", "origin": "FLN", "dest": "EZE", "from_city": "Florianópolis", "to_city": "Buenos Aires", "flag": "🇦🇷"},
-    {"id": "FLN-BRC", "origin": "FLN", "dest": "BRC", "from_city": "Florianópolis", "to_city": "Bariloche",    "flag": "🇦🇷"},
+    # ── São Paulo (GRU) ──────────────────────────────────────────────────────
+    {"id":"GRU-CUN","origin":"GRU","dest":"CUN","from_city":"São Paulo",    "to_city":"Cancún",       "flag":"🇲🇽"},
+    {"id":"GRU-MIA","origin":"GRU","dest":"MIA","from_city":"São Paulo",    "to_city":"Miami",        "flag":"🇺🇸"},
+    {"id":"GRU-ATL","origin":"GRU","dest":"ATL","from_city":"São Paulo",    "to_city":"Atlanta",      "flag":"🇺🇸"},
+    {"id":"GRU-LIS","origin":"GRU","dest":"LIS","from_city":"São Paulo",    "to_city":"Lisboa",       "flag":"🇵🇹"},
+    {"id":"GRU-MAD","origin":"GRU","dest":"MAD","from_city":"São Paulo",    "to_city":"Madri",        "flag":"🇪🇸"},
+    {"id":"GRU-CDG","origin":"GRU","dest":"CDG","from_city":"São Paulo",    "to_city":"Paris",        "flag":"🇫🇷"},
+    {"id":"GRU-FCO","origin":"GRU","dest":"FCO","from_city":"São Paulo",    "to_city":"Roma",         "flag":"🇮🇹"},
+    {"id":"GRU-GVA","origin":"GRU","dest":"GVA","from_city":"São Paulo",    "to_city":"Genebra",      "flag":"🇨🇭"},
+    {"id":"GRU-ZRH","origin":"GRU","dest":"ZRH","from_city":"São Paulo",    "to_city":"Zurique",      "flag":"🇨🇭"},
+    {"id":"GRU-IST","origin":"GRU","dest":"IST","from_city":"São Paulo",    "to_city":"Istambul",     "flag":"🇹🇷"},
+    {"id":"GRU-CAI","origin":"GRU","dest":"CAI","from_city":"São Paulo",    "to_city":"Cairo",        "flag":"🇪🇬"},
+    {"id":"GRU-DXB","origin":"GRU","dest":"DXB","from_city":"São Paulo",    "to_city":"Dubai",        "flag":"🇦🇪"},
+    {"id":"GRU-TLV","origin":"GRU","dest":"TLV","from_city":"São Paulo",    "to_city":"Tel Aviv",     "flag":"🇮🇱"},
+    {"id":"GRU-LIM","origin":"GRU","dest":"LIM","from_city":"São Paulo",    "to_city":"Lima",         "flag":"🇵🇪"},
+    {"id":"GRU-YVR","origin":"GRU","dest":"YVR","from_city":"São Paulo",    "to_city":"Vancouver",    "flag":"🇨🇦"},
+    # ── Curitiba (CWB) ───────────────────────────────────────────────────────
+    {"id":"CWB-SCL","origin":"CWB","dest":"SCL","from_city":"Curitiba",     "to_city":"Santiago",     "flag":"🇨🇱"},
+    {"id":"CWB-EZE","origin":"CWB","dest":"EZE","from_city":"Curitiba",     "to_city":"Buenos Aires", "flag":"🇦🇷"},
+    {"id":"CWB-BRC","origin":"CWB","dest":"BRC","from_city":"Curitiba",     "to_city":"Bariloche",    "flag":"🇦🇷"},
+    {"id":"CWB-CUR","origin":"CWB","dest":"CUR","from_city":"Curitiba",     "to_city":"Curaçao",      "flag":"🇨🇼"},
+    {"id":"CWB-PUJ","origin":"CWB","dest":"PUJ","from_city":"Curitiba",     "to_city":"Punta Cana",   "flag":"🇩🇴"},
+    {"id":"CWB-MCZ","origin":"CWB","dest":"MCZ","from_city":"Curitiba",     "to_city":"Maceió",       "flag":"🇧🇷"},
+    {"id":"CWB-JPA","origin":"CWB","dest":"JPA","from_city":"Curitiba",     "to_city":"João Pessoa",  "flag":"🇧🇷"},
+    {"id":"CWB-REC","origin":"CWB","dest":"REC","from_city":"Curitiba",     "to_city":"Recife",       "flag":"🇧🇷"},
+    {"id":"CWB-VIX","origin":"CWB","dest":"VIX","from_city":"Curitiba",     "to_city":"Vitória",      "flag":"🇧🇷"},
+    # ── Florianópolis (FLN) ──────────────────────────────────────────────────
+    {"id":"FLN-EZE","origin":"FLN","dest":"EZE","from_city":"Florianópolis","to_city":"Buenos Aires", "flag":"🇦🇷"},
+    {"id":"FLN-BRC","origin":"FLN","dest":"BRC","from_city":"Florianópolis","to_city":"Bariloche",    "flag":"🇦🇷"},
+    # ── Navegantes (NVT) ─────────────────────────────────────────────────────
+    {"id":"NVT-EZE","origin":"NVT","dest":"EZE","from_city":"Navegantes",   "to_city":"Buenos Aires", "flag":"🇦🇷"},
+    {"id":"NVT-MCZ","origin":"NVT","dest":"MCZ","from_city":"Navegantes",   "to_city":"Maceió",       "flag":"🇧🇷"},
+    {"id":"NVT-JPA","origin":"NVT","dest":"JPA","from_city":"Navegantes",   "to_city":"João Pessoa",  "flag":"🇧🇷"},
+    {"id":"NVT-REC","origin":"NVT","dest":"REC","from_city":"Navegantes",   "to_city":"Recife",       "flag":"🇧🇷"},
+    {"id":"NVT-VIX","origin":"NVT","dest":"VIX","from_city":"Navegantes",   "to_city":"Vitória",      "flag":"🇧🇷"},
 ]
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
