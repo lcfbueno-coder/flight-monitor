@@ -1,10 +1,12 @@
-const CACHE = 'flight-monitor-v1';
-const SHELL = ['./index.html', './manifest.json'];
+const CACHE = 'flight-monitor-v2';
+const STATIC = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
-// Instala: cacheia o shell estático
+// Instala: cacheia o shell (falha em um arquivo não derruba os outros)
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL))
+    caches.open(CACHE).then(c =>
+      Promise.allSettled(STATIC.map(u => c.add(u)))
+    )
   );
   self.skipWaiting();
 });
@@ -19,20 +21,39 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Fetch: data.json sempre da rede; resto do cache com fallback
+// Estratégia:
+//  • Navegação (index.html) e dados (data/history.json): REDE PRIMEIRO,
+//    cache só como fallback offline — o painel nunca fica preso numa
+//    versão velha após um deploy.
+//  • Demais estáticos (ícones, manifest): cache primeiro.
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
+  const req = e.request;
+  if (req.method !== 'GET') return;
 
-  // Sempre buscar data.json e history.json da rede (dados dinâmicos)
-  if (url.pathname.endsWith('data.json') || url.pathname.endsWith('history.json')) {
+  const url = new URL(req.url);
+  const isData = url.pathname.endsWith('data.json') || url.pathname.endsWith('history.json');
+
+  if (req.mode === 'navigate' || isData) {
+    // data.json chega com ?_=timestamp — normaliza a chave do cache
+    // para não acumular uma entrada por requisição.
+    const key = isData ? url.pathname : req;
     e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
+      fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(key, copy));
+        return res;
+      }).catch(() => caches.match(key))
     );
     return;
   }
 
-  // Para o shell: cache-first
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    caches.match(req).then(cached =>
+      cached || fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy));
+        return res;
+      })
+    )
   );
 });
