@@ -1,8 +1,10 @@
 {
+  "id": "flight-monitor",
   "name": "Flight Monitor",
   "short_name": "Flights",
   "description": "Monitor pessoal de tarifas aéreas",
-  "start_url": "/monitor-de-voos/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#06061a",
