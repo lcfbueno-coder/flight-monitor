@@ -22,10 +22,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -57,10 +57,12 @@ jobs:
 
       - name: Salvar screenshots de diagnóstico
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: debug-screenshots
-          path: "*.png"
+          path: |
+            *.png
+            *.html
           if-no-files-found: ignore
           retention-days: 5
 
