@@ -140,11 +140,53 @@ CELL_TEXT_RE = re.compile(
     r'^\s*(\d{1,2})\s*[\n\r]+\s*R?\$?\s*([\d]{1,3}(?:\.[\d]{3})*)\s*$',
 )
 ANY_NUMBER_RE = re.compile(r'([\d]{1,3}(?:\.[\d]{3})*)')
+# ", 7398 Reais brasileiros" (preço exato no aria-label do preço)
+REAIS_LABEL_RE = re.compile(r'([\d][\d.,]*)\s*reais', re.I)
+# "10,9 mil" (formato abreviado exibido na célula)
+MIL_TEXT_RE = re.compile(r'([\d]{1,3}(?:[.,]\d)?)\s*mil', re.I)
 
-# Coleta página inteira: aria-labels + células de grade com o mês do contexto
+
+def _price_from_cell(label, text):
+    """Preço da célula: exato do aria-label; senão do texto ('7.400'/'10,9 mil')."""
+    if label:
+        m = REAIS_LABEL_RE.search(label)
+        if m:
+            try:
+                return float(m.group(1).replace('.', '').replace(',', '.'))
+            except ValueError:
+                pass
+    if text:
+        m = MIL_TEXT_RE.search(text)
+        if m:
+            try:
+                return float(m.group(1).replace(',', '.')) * 1000
+            except ValueError:
+                pass
+        cands = []
+        for x in ANY_NUMBER_RE.findall(text):
+            try:
+                v = float(x.replace('.', ''))
+            except ValueError:
+                continue
+            if MIN_PRICE <= v <= MAX_PRICE:
+                cands.append(v)
+        if cands:
+            return min(cands)
+    return None
+
+# Coleta: células do calendário via data-iso (DOM real verificado em 04/07/2026:
+# <div role="gridcell" data-iso="2026-07-05"><div aria-label="domingo, 5 de
+# julho...">5</div><div aria-label=", 7398 Reais brasileiros">7.400</div></div>)
+# + aria-labels da página como fallback.
 COLLECT_JS = """
 () => {
   const out = [];
+  document.querySelectorAll('[data-iso]').forEach(c => {
+    const p = c.querySelector('[aria-label*="eais"]');
+    out.push({iso: c.getAttribute('data-iso'),
+              p: p ? p.getAttribute('aria-label') : null,
+              t: c.innerText});
+  });
   document.querySelectorAll('[aria-label]').forEach(e => {
     out.push({l: e.getAttribute('aria-label'), t: null, m: null});
   });
@@ -195,6 +237,18 @@ def parse_calendar_entries(entries, today, window_start, window_end):
             found[d] = price
 
     for e in entries:
+        # Camada 0: célula com data-iso (data ISO pronta + preço exato)
+        iso = e.get("iso")
+        if iso:
+            try:
+                d = date.fromisoformat(iso)
+            except ValueError:
+                continue
+            price = _price_from_cell(e.get("p"), e.get("t"))
+            if price is not None:
+                keep(d, price)
+            continue
+
         label = e.get("l") or ""
         text  = e.get("t") or ""
         mctx  = e.get("m") or ""
@@ -344,6 +398,7 @@ class GFlightsScraper:
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
         )
         self._results_dumped  = False
+        self._noprices_dumped = False
         self._cal_fail_dumped = False
         self._cal_ok_dumped   = False
 
@@ -412,7 +467,7 @@ class GFlightsScraper:
             self._dismiss_consent(page)
 
         try:
-            page.wait_for_selector(r"text=/R\$\s?\d/", timeout=25000)
+            page.wait_for_selector(r"text=/R\$\s?\d/", timeout=35000)
         except PWTimeout:
             body = page.inner_text("body").lower()
             if ("captcha" in body or "não sou um robô" in body
@@ -420,6 +475,9 @@ class GFlightsScraper:
                 print("    [CAPTCHA/bloqueio detectado]")
             else:
                 print(f"    [sem preços — URL: {page.url[:90]}]")
+                if not self._noprices_dumped:
+                    self._dump(page, "noprices")
+                    self._noprices_dumped = True
             return None
         time.sleep(2.0)
 
@@ -592,7 +650,7 @@ class GFlightsScraper:
                       wait_until="domcontentloaded", timeout=45000)
             if "consent.google" in page.url:
                 self._dismiss_consent(page)
-            page.wait_for_selector(r"text=/R\$\s?\d/", timeout=25000)
+            page.wait_for_selector(r"text=/R\$\s?\d/", timeout=35000)
             time.sleep(2.0)
             return self._extract_results(page)
         except Exception as e:
