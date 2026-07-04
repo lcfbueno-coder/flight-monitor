@@ -9,6 +9,8 @@
 <meta name="theme-color" content="#06061a">
 <title>✈ Flight Monitor</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
 /* ── Tokens ───────────────────────────────────────────── */
@@ -140,6 +142,9 @@ header {
   0%   { opacity: 0;   transform: translateY(0); }
   20%  { opacity: 1;   transform: translateY(0); }
   100% { opacity: 0;   transform: translateY(100vh); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #scan-line.scanning, .pulse, #alert-strip { animation: none; }
 }
 
 /* ── Table chrome ─────────────────────────────────────── */
@@ -352,16 +357,21 @@ footer i {
 const DATA_URL = 'data.json';
 const REFRESH_MS = 5 * 60 * 1000; // atualiza o JSON a cada 5 min
 
+// Escapa qualquer texto antes de entrar no innerHTML
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[c]));
+
 function fmt(n) {
   return 'R$ ' + Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 }
 
 function badge(status, pct, n) {
-  if (status === 'new') return `<span class="badge b-new">— novo</span>`;
+  if (status === 'new') return `<span class="badge b-new" title="${n} dia(s) de histórico">— novo</span>`;
   const sign = pct > 0 ? '+' : '';
   const icons = { error: '🚨', fire: '🔥', good: '✅', normal: '—', high: '↑' };
   const icon = icons[status] || '—';
-  return `<span class="badge b-${status}">${icon} ${sign}${pct.toFixed(0)}%</span>`;
+  return `<span class="badge b-${esc(status)}" title="${n} dias de histórico">${icon} ${sign}${pct.toFixed(0)}%</span>`;
 }
 
 function triggerScan() {
@@ -378,11 +388,11 @@ function renderBoard(data) {
 
   timeEl.textContent = `atualizado ${data.updated_fmt}`;
 
-  const hotRoutes = data.routes.filter(r => r.status === 'error' || r.status === 'fire');
+  const hotRoutes = (data.routes || []).filter(r => r.status === 'error' || r.status === 'fire');
   if (hotRoutes.length) {
     alertEl.style.display = 'block';
     alertEl.innerHTML = '🚨 ' + hotRoutes.map(r =>
-      `<b>${r.from} → ${r.to}</b> (${r.pct_change > 0 ? '+' : ''}${r.pct_change.toFixed(0)}%)`
+      `<b>${esc(r.from)} → ${esc(r.to)}</b> (${r.pct_change > 0 ? '+' : ''}${Number(r.pct_change).toFixed(0)}%)`
     ).join(' &nbsp;·&nbsp; ');
   } else {
     alertEl.style.display = 'none';
@@ -394,23 +404,30 @@ function renderBoard(data) {
   }
 
   board.innerHTML = data.routes.map(r => `
-    <tr class="${r.status}" onclick="window.open('${r.link}', '_blank')">
+    <tr class="${esc(r.status)}" data-link="${esc(r.link)}">
       <td class="cell-route">
-        <div class="route-main">${r.flag} ${r.from} → ${r.to}</div>
-        <div class="route-iata">${r.origin} → ${r.dest}</div>
+        <div class="route-main">${esc(r.flag)} ${esc(r.from)} → ${esc(r.to)}</div>
+        <div class="route-iata">${esc(r.origin)} → ${esc(r.dest)}</div>
       </td>
-      <td class="cell-airline hide-mobile">${r.airline}</td>
+      <td class="cell-airline hide-mobile">${esc(r.airline)}</td>
       <td class="cell-price">${fmt(r.price)}</td>
-      <td class="cell-date">${r.dep_fmt}</td>
-      <td class="cell-date">${r.ret_fmt}</td>
+      <td class="cell-date">${esc(r.dep_fmt)}</td>
+      <td class="cell-date">${esc(r.ret_fmt)}</td>
       <td class="cell-avg hide-mobile">${fmt(r.median_30d)}</td>
-      <td>${badge(r.status, r.pct_change, r.n_points)}</td>
-      <td class="cell-link" onclick="event.stopPropagation()">
-        <a href="${r.link}" target="_blank" rel="noopener">Kayak →</a>
+      <td>${badge(r.status, Number(r.pct_change), r.n_points)}</td>
+      <td class="cell-link">
+        <a href="${esc(r.link)}" target="_blank" rel="noopener">Kayak →</a>
       </td>
     </tr>
   `).join('');
 }
+
+// Clique na linha abre o link (delegação — sem onclick inline)
+document.getElementById('board').addEventListener('click', e => {
+  if (e.target.closest('a')) return; // o link Kayak cuida de si mesmo
+  const tr = e.target.closest('tr[data-link]');
+  if (tr) window.open(tr.dataset.link, '_blank', 'noopener');
+});
 
 async function loadData() {
   try {
