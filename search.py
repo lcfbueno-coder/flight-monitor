@@ -473,12 +473,27 @@ class GFlightsScraper:
             if ("captcha" in body or "não sou um robô" in body
                     or "unusual traffic" in body):
                 print("    [CAPTCHA/bloqueio detectado]")
+                return None
+            if "algo deu errado" in body or "something went wrong" in body:
+                # Erro transitório do Google — a própria página oferece Atualizar
+                print("    ['Algo deu errado' → clicando Atualizar]")
+                try:
+                    page.get_by_role(
+                        "button", name=re.compile("Atualizar|Refresh", re.I)
+                    ).first.click(timeout=3000)
+                except Exception:
+                    page.reload(wait_until="domcontentloaded")
+                try:
+                    page.wait_for_selector(r"text=/R\$\s?\d/", timeout=25000)
+                except PWTimeout:
+                    print("    [sem preços mesmo após atualizar]")
+                    return None
             else:
                 print(f"    [sem preços — URL: {page.url[:90]}]")
                 if not self._noprices_dumped:
                     self._dump(page, "noprices")
                     self._noprices_dumped = True
-            return None
+                return None
         time.sleep(2.0)
 
         # Dump de calibração da página de resultados (primeira rota)
@@ -513,7 +528,13 @@ class GFlightsScraper:
             return []
 
     def _open_price_panel(self, page, today, window_start, window_end):
-        """Clica em candidatos e valida por DADOS: apareceram preços por dia?"""
+        """Clica em candidatos e valida por DADOS: apareceram preços por dia?
+
+        Distingue dois estados (visto nos dumps de 04/07/2026):
+          • calendário ABERTO mas sem a camada de preços → espera mais
+            (até ~15 s) e dá uma cutucada (Avançar dispara novo fetch);
+          • clique não abriu nada → tenta o próximo candidato.
+        """
         openers = [
             'input[aria-label*="Partida" i]:visible',
             'input[aria-label*="Departure" i]:visible',
@@ -522,26 +543,50 @@ class GFlightsScraper:
             '[aria-label*="Gráfico de preços" i]:visible',
             '[aria-label*="Price graph" i]:visible',
         ]
-        first_click = True
         for sel in openers:
             try:
                 page.locator(sel).first.click(timeout=2500)
             except Exception:
                 continue
-            rounds = 6 if first_click else 3
-            first_click = False
-            for _ in range(rounds):
-                time.sleep(1.4)
-                if parse_calendar_entries(self._collect(page), today,
+            calendar_open = False
+            for i in range(10):  # até ~15 s
+                time.sleep(1.5)
+                entries = self._collect(page)
+                if parse_calendar_entries(entries, today,
                                           window_start, window_end):
                     print(f"    calendário aberto ({sel.split(':')[0]})")
                     return True
+                n_dates = sum(
+                    1 for e in entries
+                    if e.get("iso")
+                    or (e.get("l") and CAL_DATE_RE.search(e["l"]))
+                )
+                if n_dates >= 15:
+                    calendar_open = True
+                    if i == 5:
+                        self._advance_month(page)  # cutucada
+                elif not calendar_open and i >= 2:
+                    break  # este clique não abriu nada — próximo candidato
+            if calendar_open:
+                print("    [calendário abriu, mas o Google não retornou "
+                      "a camada de preços]")
+                return False  # inútil clicar os demais candidatos
         return False
 
     def _advance_month(self, page):
+        # DOM real (04/07/2026): a seta tem aria-label="Avançar"
+        for sel in ['[aria-label="Avançar"]:visible',
+                    '[aria-label="Próximo"]:visible',
+                    '[aria-label="Next"]:visible']:
+            try:
+                page.locator(sel).first.click(timeout=1500)
+                time.sleep(1.8)
+                return True
+            except Exception:
+                continue
         try:
             btns = page.get_by_role(
-                "button", name=re.compile(r"Próximo|Next", re.I)
+                "button", name=re.compile(r"Avançar|Próximo|Next", re.I)
             ).all()
         except Exception:
             return False
@@ -667,7 +712,7 @@ class GFlightsScraper:
 
 def main():
     now_br = datetime.now(TZ_BR)
-    print(f"▶ Flight Monitor v3.1 — {now_br.strftime('%d/%m/%Y %H:%M')} "
+    print(f"▶ Flight Monitor v3.3 — {now_br.strftime('%d/%m/%Y %H:%M')} "
           f"(horário de Brasília)")
     print(f"  Janela: partidas de D+{MIN_DEP_OFFSET} a D+{SEARCH_WINDOW}  |  "
           f"Durações: {TRIP_DURATIONS} dias  |  Âncora fixa: D+{ANCHOR_OFFSET}")
