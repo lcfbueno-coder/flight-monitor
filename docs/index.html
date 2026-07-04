@@ -60,10 +60,37 @@ header {
   border-bottom: 1px solid var(--border);
   padding: 14px 18px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px 12px;
   backdrop-filter: blur(12px);
+}
+
+.controls { display: flex; align-items: center; gap: 12px; }
+
+.sort-toggle {
+  display: flex;
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.sort-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 9px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.sort-toggle button + button { border-left: 1px solid var(--border2); }
+.sort-toggle button.active {
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 
 .brand {
@@ -167,7 +194,7 @@ thead th {
   border-bottom: 2px solid var(--border2);
   white-space: nowrap;
   position: sticky;
-  top: 0;
+  top: var(--header-h, 57px);
   z-index: 10;
 }
 
@@ -313,9 +340,15 @@ footer i {
     <span class="brand-title">✈ Flight Monitor</span>
     <span class="brand-sub" id="update-time">carregando…</span>
   </div>
-  <div class="live-badge">
-    <span class="pulse"></span>
-    <span id="live-label">live</span>
+  <div class="controls">
+    <div class="sort-toggle" id="sort-toggle">
+      <button data-sort="origin" class="active">Origem</button>
+      <button data-sort="price">Menor preço</button>
+    </div>
+    <div class="live-badge">
+      <span class="pulse"></span>
+      <span id="live-label">live</span>
+    </div>
   </div>
 </header>
 
@@ -375,6 +408,45 @@ function badge(status, pct, n) {
   return `<span class="badge b-${esc(status)}" title="${n} dias de histórico">${icon} ${sign}${pct.toFixed(0)}%</span>`;
 }
 
+// ── Ordenação ─────────────────────────────────────────
+let sortMode = 'origin';
+let lastData = null;
+const ORIGIN_ORDER = { CWB: 0, NVT: 1, FLN: 2, GRU: 3 };
+
+function sortRoutes(routes) {
+  const r = [...(routes || [])];
+  if (sortMode === 'price') {
+    r.sort((a, b) => a.price - b.price);
+  } else {
+    r.sort((a, b) => {
+      const oa = ORIGIN_ORDER[a.origin] ?? 9;
+      const ob = ORIGIN_ORDER[b.origin] ?? 9;
+      if (oa !== ob) return oa - ob;
+      return String(a.to).localeCompare(String(b.to), 'pt-BR');
+    });
+  }
+  return r;
+}
+
+document.getElementById('sort-toggle').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-sort]');
+  if (!btn || btn.dataset.sort === sortMode) return;
+  sortMode = btn.dataset.sort;
+  document.querySelectorAll('#sort-toggle button').forEach(b =>
+    b.classList.toggle('active', b === btn));
+  if (lastData) renderBoard(lastData);
+});
+
+// ── Altura real do header → offset do thead sticky ────
+function syncHeaderOffset() {
+  const h = document.querySelector('header');
+  if (h) {
+    document.documentElement.style.setProperty('--header-h', h.offsetHeight + 'px');
+  }
+}
+window.addEventListener('resize', syncHeaderOffset);
+syncHeaderOffset();
+
 function triggerScan() {
   const el = document.getElementById('scan-line');
   el.classList.remove('scanning');
@@ -392,7 +464,8 @@ function renderBoard(data) {
   const scope = document.getElementById('scope-note');
   if (scope && data.window_days) {
     const durs = (data.durations || []).join('/');
-    scope.textContent = `menor tarifa dos próximos ${data.window_days} dias · viagens de ${durs} dias`;
+    const ini = data.window_start ? `${data.window_start} e ` : '';
+    scope.textContent = `menor tarifa entre ${ini}${data.window_days} dias à frente · viagens de ${durs} dias`;
   }
 
   const hotRoutes = (data.routes || []).filter(r => r.status === 'error' || r.status === 'fire');
@@ -410,7 +483,7 @@ function renderBoard(data) {
     return;
   }
 
-  board.innerHTML = data.routes.map(r => `
+  board.innerHTML = sortRoutes(data.routes).map(r => `
     <tr class="${esc(r.status)}" data-link="${esc(r.link)}">
       <td class="cell-route">
         <div class="route-main">${esc(r.flag)} ${esc(r.from)} → ${esc(r.to)}</div>
@@ -441,8 +514,10 @@ async function loadData() {
     const res = await fetch(DATA_URL + '?_=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    lastData = data;
     triggerScan();
     renderBoard(data);
+    syncHeaderOffset();
     document.getElementById('live-label').textContent = 'live';
   } catch (e) {
     document.getElementById('update-time').textContent = 'erro ao carregar';
@@ -451,15 +526,6 @@ async function loadData() {
   }
 }
 
-function updateStickyOffset() {
-  const h = document.querySelector('header').offsetHeight;
-  document.querySelectorAll('thead th').forEach(th => {
-    th.style.top = h + 'px';
-  });
-}
-updateStickyOffset();
-window.addEventListener('resize', updateStickyOffset);
-  
 loadData();
 setInterval(loadData, REFRESH_MS);
 
