@@ -211,12 +211,12 @@ tbody tr {
 tbody tr:hover { background: var(--surface2); }
 
 /* Status left-border */
-tbody tr.error  { border-left: 3px solid var(--error); }
-tbody tr.fire   { border-left: 3px solid var(--fire);  }
-tbody tr.good   { border-left: 3px solid var(--good);  }
-tbody tr.normal { border-left: 3px solid transparent;  }
-tbody tr.high   { border-left: 3px solid transparent;  }
-tbody tr.new    { border-left: 3px solid var(--new);   }
+tbody tr.error  { border-left: 3px solid #ffd700; }
+tbody tr.fire   { border-left: 3px solid #ffd700; }
+tbody tr.good   { border-left: 3px solid var(--good); }
+tbody tr.normal { border-left: 3px solid transparent; }
+tbody tr.high   { border-left: 3px solid var(--error); }
+tbody tr.new    { border-left: 3px solid var(--new); }
 
 tbody td {
   padding: 11px 10px;
@@ -244,12 +244,12 @@ tbody td {
   font-weight: 700;
   font-size: 0.9rem;
 }
-tr.error  .cell-price { color: var(--error); }
-tr.fire   .cell-price { color: var(--fire);  }
-tr.good   .cell-price { color: var(--good);  }
-tr.normal .cell-price { color: var(--text);  }
-tr.high   .cell-price { color: var(--dim);   }
-tr.new    .cell-price { color: var(--text);  }
+tr.error  .cell-price { color: #ffd700; }
+tr.fire   .cell-price { color: #ffd700; }
+tr.good   .cell-price { color: var(--good); }
+tr.normal .cell-price { color: var(--text); }
+tr.high   .cell-price { color: var(--error); }
+tr.new    .cell-price { color: var(--text); }
 
 .cell-date { color: var(--dim); font-size: 0.78rem; }
 
@@ -265,12 +265,12 @@ tr.new    .cell-price { color: var(--text);  }
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-.badge.b-error  { background: rgba(255,71,87,0.15);  color: var(--error); }
-.badge.b-fire   { background: rgba(255,159,67,0.15); color: var(--fire);  }
-.badge.b-good   { background: rgba(38,222,129,0.12); color: var(--good);  }
+.badge.b-error  { background: rgba(255,215,0,0.15);  color: #ffd700; }
+.badge.b-fire   { background: rgba(255,215,0,0.15);  color: #ffd700; }
+.badge.b-good   { background: rgba(38,222,129,0.12); color: var(--good); }
 .badge.b-normal { background: transparent; color: var(--muted); }
-.badge.b-high   { background: transparent; color: var(--high);  }
-.badge.b-new    { background: rgba(80,80,160,0.15); color: var(--new); }
+.badge.b-high   { background: rgba(255,71,87,0.15);  color: var(--error); }
+.badge.b-new    { background: rgba(80,80,160,0.15);  color: var(--new); }
 
 .cell-link a {
   display: inline-block;
