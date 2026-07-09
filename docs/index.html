@@ -333,6 +333,22 @@ footer i {
   table { min-width: 480px; }
   thead th, tbody td { padding: 9px 7px; }
 }
+  /* ── Seção cruzeiros ──────────────────────────────────── */
+.section-divider td {
+  padding: 10px 10px;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--surface2);
+  border-top: 2px solid var(--border2);
+  border-bottom: 1px solid var(--border2);
+}
+tbody tr.cruise      { border-left: 3px solid #0099cc; }
+tbody tr.cruise-min  { border-left: 3px solid var(--gold); background: rgba(255,215,0,0.03); }
+tr.cruise     .cell-price,
+tr.cruise-min .cell-price { color: #0099cc; }
+tr.cruise-min .cell-price { color: var(--gold); }
 </style>
 </head>
 <body>
@@ -459,13 +475,13 @@ function triggerScan() {
   el.classList.add('scanning');
 }
 
-function renderBoard(data) {
-  const board = document.getElementById('board');
+function renderBoard(data, cruiseData) {
+  const board   = document.getElementById('board');
   const alertEl = document.getElementById('alert-strip');
-  const timeEl = document.getElementById('update-time');
-
+  const timeEl  = document.getElementById('update-time');
   timeEl.textContent = `atualizado ${data.updated_fmt}`;
 
+  // ← preservar este bloco do seu HTML atual
   const scope = document.getElementById('scope-note');
   if (scope && data.window_days) {
     const durs = (data.durations || []).join('/');
@@ -488,7 +504,8 @@ function renderBoard(data) {
     return;
   }
 
-  board.innerHTML = sortRoutes(data.routes).map(r => `
+  // ← sortRoutes em vez de data.routes direto
+  let rows = sortRoutes(data.routes).map(r => `
     <tr class="${esc(r.status)}" data-link="${esc(r.link)}">
       <td class="cell-route">
         <div class="route-main">${esc(r.flag)} ${esc(r.from)} → ${esc(r.to)}</div>
@@ -503,8 +520,38 @@ function renderBoard(data) {
       <td class="cell-link">
         <a href="${esc(r.link)}" target="_blank" rel="noopener">Kayak →</a>
       </td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
+
+  if (cruiseData && cruiseData.cruises && cruiseData.cruises.length > 0) {
+    rows += `<tr class="section-divider">
+      <td colspan="8">🛳️ Grand Voyages 2027 · atualizado ${esc(cruiseData.updated_fmt)}</td>
+    </tr>`;
+    rows += cruiseData.cruises.map(c => {
+      const cls    = c.is_new_min ? 'cruise-min' : 'cruise';
+      const pct    = c.n_points > 1 ? c.pct_vs_min : null;
+      const pctTxt = pct === null
+        ? `<span class="badge b-new">— novo</span>`
+        : `<span class="badge ${pct < 0 ? 'b-good' : 'b-high'}">${pct > 0 ? '↑ +' : '✅ '}${pct.toFixed(0)}%</span>`;
+      return `
+      <tr class="${cls}" data-link="${esc(c.url)}">
+        <td class="cell-route">
+          <div class="route-main">🛳️ ${esc(c.name)}</div>
+          <div class="route-iata">${esc(c.route)}</div>
+        </td>
+        <td class="cell-airline hide-mobile">${esc(c.cabin)}</td>
+        <td class="cell-price">${fmt(c.price)}<span style="font-size:.65rem;color:var(--dim)">/pessoa</span></td>
+        <td class="cell-date">${esc(c.date_fmt)}</td>
+        <td class="cell-date">${c.nights} noites</td>
+        <td class="cell-avg hide-mobile">${c.n_points > 1 ? fmt(c.min_ever) : '—'}</td>
+        <td>${pctTxt}</td>
+        <td class="cell-link">
+          <a href="${esc(c.url)}" target="_blank" rel="noopener">MSC →</a>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  board.innerHTML = rows;
 }
 
 // Clique na linha abre o link (delegação — sem onclick inline)
@@ -516,13 +563,16 @@ document.getElementById('board').addEventListener('click', e => {
 
 async function loadData() {
   try {
-    const res = await fetch(DATA_URL + '?_=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    lastData = data;
-    triggerScan();
-    renderBoard(data);
-    syncHeaderOffset();
+    const [fr, cr] = await Promise.all([
+      fetch(DATA_URL          + '?_=' + Date.now()),
+      fetch('cruise_data.json' + '?_=' + Date.now()),
+    ]);
+    const flightData = fr.ok ? await fr.json() : null;
+    const cruiseData = cr.ok ? await cr.json() : null;
+    if (flightData) {
+      triggerScan();
+      renderBoard(flightData, cruiseData);
+    }
     document.getElementById('live-label').textContent = 'live';
   } catch (e) {
     document.getElementById('update-time').textContent = 'erro ao carregar';
@@ -530,7 +580,6 @@ async function loadData() {
     console.error(e);
   }
 }
-
 loadData();
 setInterval(loadData, REFRESH_MS);
 
