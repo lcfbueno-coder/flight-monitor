@@ -333,18 +333,17 @@ def build_gflights_url(origin, dest, dep, ret):
 
 
 def get_status(pct, n_prev):
-    """n_prev = quantidade de dias ANTERIORES no histórico."""
     if n_prev < MIN_POINTS_FOR_PCT:
         return "new"
     if pct <= -50:
-        return "error"
+        return "error"   # dourado
     if pct <= -30:
-        return "fire"
+        return "fire"    # dourado
     if pct < 0:
-        return "good"
+        return "good"    # verde — qualquer preço abaixo da média
     if pct > 0:
-        return "high"
-    return "normal"
+        return "high"    # vermelho — qualquer preço acima da média
+    return "normal"      # exatamente 0%
 
 
 def load_json(path, default=None):
