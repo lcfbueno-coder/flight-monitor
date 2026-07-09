@@ -340,9 +340,9 @@ def get_status(pct, n_prev):
         return "error"
     if pct <= -30:
         return "fire"
-    if pct <= 0:
+    if pct < 0:
         return "good"
-    if pct >= 0:
+    if pct > 0:
         return "high"
     return "normal"
 
