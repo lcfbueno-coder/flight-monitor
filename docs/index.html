@@ -25,6 +25,7 @@
   --muted:      #30305a;
   --accent:     #4d6fff;
   --accent-dim: #1e2966;
+  --gold:       #ffd700;
 
   --error:  #ff4757;
   --fire:   #ff9f43;
@@ -98,7 +99,6 @@ header {
   align-items: baseline;
   gap: 10px;
 }
-
 .brand-title {
   font-size: 0.95rem;
   font-weight: 700;
@@ -106,7 +106,6 @@ header {
   color: var(--text);
   text-transform: uppercase;
 }
-
 .brand-sub {
   font-size: 0.62rem;
   color: var(--dim);
@@ -121,7 +120,6 @@ header {
   font-size: 0.72rem;
   color: var(--dim);
 }
-
 .pulse {
   width: 7px; height: 7px;
   border-radius: 50%;
@@ -150,7 +148,7 @@ header {
   50%       { border-color: rgba(255,71,87,0.7); }
 }
 
-/* ── Scan line (signature animation on refresh) ──────── */
+/* ── Scan line ────────────────────────────────────────── */
 #scan-line {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -180,13 +178,11 @@ header {
   max-height: calc(100dvh - var(--chrome-h, 118px));
   -webkit-overflow-scrolling: touch;
 }
-
 table {
   width: 100%;
   border-collapse: collapse;
   min-width: 700px;
 }
-
 thead th {
   padding: 8px 10px;
   text-align: left;
@@ -201,18 +197,16 @@ thead th {
   top: 0;
   z-index: 10;
 }
-
 tbody tr {
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.12s;
 }
-
 tbody tr:hover { background: var(--surface2); }
 
 /* Status left-border */
-tbody tr.error  { border-left: 3px solid #ffd700; }
-tbody tr.fire   { border-left: 3px solid #ffd700; }
+tbody tr.error  { border-left: 3px solid var(--gold); }
+tbody tr.fire   { border-left: 3px solid var(--gold); }
 tbody tr.good   { border-left: 3px solid var(--good); }
 tbody tr.normal { border-left: 3px solid transparent; }
 tbody tr.high   { border-left: 3px solid var(--error); }
@@ -237,23 +231,16 @@ tbody td {
   margin-top: 2px;
   letter-spacing: 0.06em;
 }
-
 .cell-airline { color: var(--dim); font-size: 0.76rem; }
-
-.cell-price {
-  font-weight: 700;
-  font-size: 0.9rem;
-}
-tr.error  .cell-price { color: #ffd700; }
-tr.fire   .cell-price { color: #ffd700; }
+.cell-price { font-weight: 700; font-size: 0.9rem; }
+tr.error  .cell-price { color: var(--gold); }
+tr.fire   .cell-price { color: var(--gold); }
 tr.good   .cell-price { color: var(--good); }
 tr.normal .cell-price { color: var(--text); }
 tr.high   .cell-price { color: var(--error); }
 tr.new    .cell-price { color: var(--text); }
-
 .cell-date { color: var(--dim); font-size: 0.78rem; }
-
-.cell-avg { color: var(--muted); font-size: 0.75rem; }
+.cell-avg  { color: var(--muted); font-size: 0.75rem; }
 
 .badge {
   display: inline-flex;
@@ -265,8 +252,8 @@ tr.new    .cell-price { color: var(--text); }
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-.badge.b-error  { background: rgba(255,215,0,0.15);  color: #ffd700; }
-.badge.b-fire   { background: rgba(255,215,0,0.15);  color: #ffd700; }
+.badge.b-error  { background: rgba(255,215,0,0.15);  color: var(--gold); }
+.badge.b-fire   { background: rgba(255,215,0,0.15);  color: var(--gold); }
 .badge.b-good   { background: rgba(38,222,129,0.12); color: var(--good); }
 .badge.b-normal { background: transparent; color: var(--muted); }
 .badge.b-high   { background: rgba(255,71,87,0.15);  color: var(--error); }
@@ -283,10 +270,23 @@ tr.new    .cell-price { color: var(--text); }
   letter-spacing: 0.06em;
   transition: background 0.12s, border-color 0.12s;
 }
-.cell-link a:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
+.cell-link a:hover { background: var(--accent-dim); border-color: var(--accent); }
+
+/* ── Seção cruzeiros ──────────────────────────────────── */
+.section-divider td {
+  padding: 10px 10px;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--surface2);
+  border-top: 2px solid var(--border2);
+  border-bottom: 1px solid var(--border2);
 }
+tbody tr.cruise     { border-left: 3px solid #0099cc; }
+tbody tr.cruise-min { border-left: 3px solid var(--gold); background: rgba(255,215,0,0.03); }
+tr.cruise     .cell-price { color: #0099cc; }
+tr.cruise-min .cell-price { color: var(--gold); }
 
 /* ── Footer / legend ──────────────────────────────────── */
 footer {
@@ -300,11 +300,7 @@ footer {
   color: var(--muted);
 }
 footer span { display: flex; align-items: center; gap: 5px; }
-footer i {
-  display: inline-block;
-  width: 8px; height: 8px;
-  border-radius: 2px;
-}
+footer i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
 
 /* ── Empty / loading ──────────────────────────────────── */
 .state-row td {
@@ -314,7 +310,6 @@ footer i {
   font-family: var(--font-ui);
   cursor: default;
 }
-
 .spinner {
   display: inline-block;
   width: 18px; height: 18px;
@@ -333,22 +328,6 @@ footer i {
   table { min-width: 480px; }
   thead th, tbody td { padding: 9px 7px; }
 }
-  /* ── Seção cruzeiros ──────────────────────────────────── */
-.section-divider td {
-  padding: 10px 10px;
-  font-size: 0.65rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--accent);
-  background: var(--surface2);
-  border-top: 2px solid var(--border2);
-  border-bottom: 1px solid var(--border2);
-}
-tbody tr.cruise      { border-left: 3px solid #0099cc; }
-tbody tr.cruise-min  { border-left: 3px solid var(--gold); background: rgba(255,215,0,0.03); }
-tr.cruise     .cell-price,
-tr.cruise-min .cell-price { color: #0099cc; }
-tr.cruise-min .cell-price { color: var(--gold); }
 </style>
 </head>
 <body>
@@ -400,18 +379,23 @@ tr.cruise-min .cell-price { color: var(--gold); }
 
 <footer>
   <span id="scope-note" style="color:var(--dim)"></span>
-  <span><i style="background:var(--error)"></i> erro de tarifa (&lt;−50%)</span>
-  <span><i style="background:var(--fire)"></i> promoção excepcional (−30 a −50%)</span>
-  <span><i style="background:var(--good)"></i> bom preço (−10 a −30%)</span>
-  <span><i style="background:var(--muted)"></i> preço normal</span>
+  <span><i style="background:var(--gold)"></i> erro de tarifa / promoção excepcional</span>
+  <span><i style="background:var(--good)"></i> bom preço</span>
+  <span><i style="background:var(--error)"></i> acima da média</span>
   <span><i style="background:var(--new)"></i> histórico insuficiente</span>
 </footer>
 
 <script>
-const DATA_URL = 'data.json';
-const REFRESH_MS = 5 * 60 * 1000; // atualiza o JSON a cada 5 min
+const DATA_URL   = 'data.json';
+const CRUISE_URL = 'cruise_data.json';
+const REFRESH_MS = 5 * 60 * 1000;
 
-// Escapa qualquer texto antes de entrar no innerHTML
+// ── Globais de estado ─────────────────────────────────
+let _flightData = null;
+let _cruiseData = null;
+let sortMode    = 'origin';
+
+// ── Helpers ───────────────────────────────────────────
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
@@ -421,16 +405,15 @@ function fmt(n) {
 }
 
 function badge(status, pct, n) {
-  if (status === 'new') return `<span class="badge b-new" title="${n} dia(s) de histórico">— novo</span>`;
+  if (status === 'new')
+    return `<span class="badge b-new" title="${n} dia(s) de histórico">— novo</span>`;
   const sign = pct > 0 ? '+' : '';
   const icons = { error: '🚨', fire: '🔥', good: '✅', normal: '—', high: '↑' };
-  const icon = icons[status] || '—';
+  const icon  = icons[status] || '—';
   return `<span class="badge b-${esc(status)}" title="${n} dias de histórico">${icon} ${sign}${pct.toFixed(0)}%</span>`;
 }
 
 // ── Ordenação ─────────────────────────────────────────
-let sortMode = 'origin';
-let lastData = null;
 const ORIGIN_ORDER = { CWB: 0, NVT: 1, FLN: 2, GRU: 3 };
 
 function sortRoutes(routes) {
@@ -448,16 +431,18 @@ function sortRoutes(routes) {
   return r;
 }
 
+// ── Sort toggle ───────────────────────────────────────
 document.getElementById('sort-toggle').addEventListener('click', e => {
   const btn = e.target.closest('button[data-sort]');
   if (!btn || btn.dataset.sort === sortMode) return;
   sortMode = btn.dataset.sort;
   document.querySelectorAll('#sort-toggle button').forEach(b =>
     b.classList.toggle('active', b === btn));
-  if (lastData) renderBoard(lastData);
+  // usa as globais — garante que cruzeiros também aparecem no re-render
+  if (_flightData) renderBoard(_flightData, _cruiseData);
 });
 
-// ── Altura real do header → offset do thead sticky ────
+// ── Offset sticky thead ───────────────────────────────
 function syncHeaderOffset() {
   const h = document.querySelector('header');
   const a = document.getElementById('alert-strip');
@@ -468,43 +453,50 @@ function syncHeaderOffset() {
 window.addEventListener('resize', syncHeaderOffset);
 syncHeaderOffset();
 
+// ── Scan line ─────────────────────────────────────────
 function triggerScan() {
   const el = document.getElementById('scan-line');
   el.classList.remove('scanning');
-  void el.offsetWidth; // reflow
+  void el.offsetWidth;
   el.classList.add('scanning');
 }
 
+// ── Render ────────────────────────────────────────────
 function renderBoard(data, cruiseData) {
   const board   = document.getElementById('board');
   const alertEl = document.getElementById('alert-strip');
   const timeEl  = document.getElementById('update-time');
+
   timeEl.textContent = `atualizado ${data.updated_fmt}`;
 
-  // ← preservar este bloco do seu HTML atual
   const scope = document.getElementById('scope-note');
   if (scope && data.window_days) {
     const durs = (data.durations || []).join('/');
-    const ini = data.window_start ? `${data.window_start} e ` : '';
-    scope.textContent = `menor tarifa entre ${ini}${data.window_days} dias à frente · viagens de ${durs} dias`;
+    const ini  = data.window_start ? `${data.window_start} e ` : '';
+    scope.textContent =
+      `menor tarifa entre ${ini}${data.window_days} dias à frente · viagens de ${durs} dias`;
   }
 
-  const hotRoutes = (data.routes || []).filter(r => r.status === 'error' || r.status === 'fire');
+  const hotRoutes = (data.routes || []).filter(
+    r => r.status === 'error' || r.status === 'fire'
+  );
   if (hotRoutes.length) {
     alertEl.style.display = 'block';
     alertEl.innerHTML = '🚨 ' + hotRoutes.map(r =>
       `<b>${esc(r.from)} → ${esc(r.to)}</b> (${r.pct_change > 0 ? '+' : ''}${Number(r.pct_change).toFixed(0)}%)`
     ).join(' &nbsp;·&nbsp; ');
+    syncHeaderOffset();
   } else {
     alertEl.style.display = 'none';
   }
 
   if (!data.routes || data.routes.length === 0) {
-    board.innerHTML = '<tr class="state-row"><td colspan="8">Nenhuma rota disponível.</td></tr>';
+    board.innerHTML =
+      '<tr class="state-row"><td colspan="8">Nenhuma rota disponível.</td></tr>';
     return;
   }
 
-  // ← sortRoutes em vez de data.routes direto
+  // ── Linhas de voos ──────────────────────────────────
   let rows = sortRoutes(data.routes).map(r => `
     <tr class="${esc(r.status)}" data-link="${esc(r.link)}">
       <td class="cell-route">
@@ -522,10 +514,12 @@ function renderBoard(data, cruiseData) {
       </td>
     </tr>`).join('');
 
+  // ── Linhas de cruzeiros ─────────────────────────────
   if (cruiseData && cruiseData.cruises && cruiseData.cruises.length > 0) {
     rows += `<tr class="section-divider">
       <td colspan="8">🛳️ Grand Voyages 2027 · atualizado ${esc(cruiseData.updated_fmt)}</td>
     </tr>`;
+
     rows += cruiseData.cruises.map(c => {
       const cls    = c.is_new_min ? 'cruise-min' : 'cruise';
       const pct    = c.n_points > 1 ? c.pct_vs_min : null;
@@ -533,7 +527,7 @@ function renderBoard(data, cruiseData) {
         ? `<span class="badge b-new">— novo</span>`
         : `<span class="badge ${pct < 0 ? 'b-good' : 'b-high'}">${pct > 0 ? '↑ +' : '✅ '}${pct.toFixed(0)}%</span>`;
       return `
-      <tr class="${cls}" data-link="${esc(c.url)}">
+      <tr class="${esc(cls)}" data-link="${esc(c.url)}">
         <td class="cell-route">
           <div class="route-main">🛳️ ${esc(c.name)}</div>
           <div class="route-iata">${esc(c.route)}</div>
@@ -554,32 +548,34 @@ function renderBoard(data, cruiseData) {
   board.innerHTML = rows;
 }
 
-// Clique na linha abre o link (delegação — sem onclick inline)
+// ── Clique na linha ───────────────────────────────────
 document.getElementById('board').addEventListener('click', e => {
-  if (e.target.closest('a')) return; // o link Kayak cuida de si mesmo
+  if (e.target.closest('a')) return;
   const tr = e.target.closest('tr[data-link]');
   if (tr) window.open(tr.dataset.link, '_blank', 'noopener');
 });
 
+// ── Carga de dados ────────────────────────────────────
 async function loadData() {
   try {
     const [fr, cr] = await Promise.all([
-      fetch(DATA_URL          + '?_=' + Date.now()),
-      fetch('cruise_data.json' + '?_=' + Date.now()),
+      fetch(DATA_URL   + '?_=' + Date.now()),
+      fetch(CRUISE_URL + '?_=' + Date.now()),
     ]);
-    const flightData = fr.ok ? await fr.json() : null;
-    const cruiseData = cr.ok ? await cr.json() : null;
-    if (flightData) {
+    _flightData = fr.ok ? await fr.json() : null;
+    _cruiseData = cr.ok ? await cr.json() : null;
+    if (_flightData) {
       triggerScan();
-      renderBoard(flightData, cruiseData);
+      renderBoard(_flightData, _cruiseData);
     }
     document.getElementById('live-label').textContent = 'live';
   } catch (e) {
     document.getElementById('update-time').textContent = 'erro ao carregar';
-    document.getElementById('live-label').textContent = 'offline';
+    document.getElementById('live-label').textContent  = 'offline';
     console.error(e);
   }
 }
+
 loadData();
 setInterval(loadData, REFRESH_MS);
 
