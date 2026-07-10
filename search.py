@@ -331,19 +331,18 @@ def build_gflights_url(origin, dest, dep, ret):
     return ("https://www.google.com/travel/flights?q=" + quote(q)
             + "&hl=pt-BR&gl=BR&curr=BRL")
 
-
 def get_status(pct, n_prev):
     if n_prev < MIN_POINTS_FOR_PCT:
         return "new"
     if pct <= -50:
-        return "error"   # dourado
+        return "error"
     if pct <= -30:
-        return "fire"    # dourado
-    if pct < 0:
-        return "good"    # verde — qualquer preço abaixo da média
-    if pct > 0:
-        return "high"    # vermelho — qualquer preço acima da média
-    return "normal"      # exatamente 0%
+        return "fire"
+    if pct <= -10:
+        return "good"    # verde a partir de -10%
+    if pct >= 20:
+        return "high"    # vermelho a partir de +20%
+    return "normal"      # neutro entre -10% e +20%
 
 
 def load_json(path, default=None):
