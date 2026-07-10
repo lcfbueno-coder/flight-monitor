@@ -85,6 +85,7 @@ ROUTES = [
     {"id": "GRU-MCO", "origin": "GRU", "dest": "MCO", "from_city": "São Paulo",     "to_city": "Orlando",      "flag": "🇺🇸"},
     {"id": "GRU-LIS", "origin": "GRU", "dest": "LIS", "from_city": "São Paulo",     "to_city": "Lisboa",       "flag": "🇵🇹"},
     {"id": "GRU-MAD", "origin": "GRU", "dest": "MAD", "from_city": "São Paulo",     "to_city": "Madri",        "flag": "🇪🇸"},
+    {"id": "GRU-BCN", "origin": "GRU", "dest": "BCN", "from_city": "São Paulo",     "to_city": "Barcelona",        "flag": "🇪🇸"},
     {"id": "GRU-CDG", "origin": "GRU", "dest": "CDG", "from_city": "São Paulo",     "to_city": "Paris",        "flag": "🇫🇷"},
     {"id": "GRU-FCO", "origin": "GRU", "dest": "FCO", "from_city": "São Paulo",     "to_city": "Roma",         "flag": "🇮🇹"},
     {"id": "GRU-MXP", "origin": "GRU", "dest": "MXP", "from_city": "São Paulo",     "to_city": "Milão",        "flag": "🇮🇹"},
