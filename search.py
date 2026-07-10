@@ -85,7 +85,7 @@ ROUTES = [
     {"id": "GRU-MCO", "origin": "GRU", "dest": "MCO", "from_city": "São Paulo",     "to_city": "Orlando",      "flag": "🇺🇸"},
     {"id": "GRU-LIS", "origin": "GRU", "dest": "LIS", "from_city": "São Paulo",     "to_city": "Lisboa",       "flag": "🇵🇹"},
     {"id": "GRU-MAD", "origin": "GRU", "dest": "MAD", "from_city": "São Paulo",     "to_city": "Madri",        "flag": "🇪🇸"},
-    {"id": "GRU-BCN", "origin": "GRU", "dest": "BCN", "from_city": "São Paulo",     "to_city": "Barcelona",        "flag": "🇪🇸"},
+    {"id": "GRU-BCN", "origin": "GRU", "dest": "BCN", "from_city": "São Paulo",     "to_city": "Barcelona",    "flag": "🇪🇸"},
     {"id": "GRU-CDG", "origin": "GRU", "dest": "CDG", "from_city": "São Paulo",     "to_city": "Paris",        "flag": "🇫🇷"},
     {"id": "GRU-FCO", "origin": "GRU", "dest": "FCO", "from_city": "São Paulo",     "to_city": "Roma",         "flag": "🇮🇹"},
     {"id": "GRU-MXP", "origin": "GRU", "dest": "MXP", "from_city": "São Paulo",     "to_city": "Milão",        "flag": "🇮🇹"},
@@ -99,6 +99,7 @@ ROUTES = [
     {"id": "GRU-YVR", "origin": "GRU", "dest": "YVR", "from_city": "São Paulo",     "to_city": "Vancouver",    "flag": "🇨🇦"},
     # ── Curitiba (CWB) ───────────────────────────────────────────────────────
     {"id": "CWB-SCL", "origin": "CWB", "dest": "SCL", "from_city": "Curitiba",      "to_city": "Santiago",     "flag": "🇨🇱"},
+    {"id": "CWB-PMC", "origin": "CWB", "dest": "PMC", "from_city": "Curitiba",      "to_city": "Puerto Montt", "flag": "🇨🇱"},
     {"id": "CWB-EZE", "origin": "CWB", "dest": "EZE", "from_city": "Curitiba",      "to_city": "Buenos Aires", "flag": "🇦🇷"},
     {"id": "CWB-BRC", "origin": "CWB", "dest": "BRC", "from_city": "Curitiba",      "to_city": "Bariloche",    "flag": "🇦🇷"},
     {"id": "CWB-CUR", "origin": "CWB", "dest": "CUR", "from_city": "Curitiba",      "to_city": "Curaçao",      "flag": "🇨🇼"},
