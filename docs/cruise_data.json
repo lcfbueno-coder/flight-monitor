@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-07-16T22:54:39.710698+00:00",
-  "updated_fmt": "16/07/2026 19:53",
+  "updated_at": "2026-07-17T11:28:40.700384+00:00",
+  "updated_fmt": "17/07/2026 08:27",
   "cruises": [
     {
       "id": "divina",
@@ -13,7 +13,7 @@
       "min_ever": 7233,
       "pct_vs_min": 0.0,
       "is_new_min": false,
-      "n_points": 7,
+      "n_points": 8,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=DI20270314SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
     },
     {
@@ -27,7 +27,7 @@
       "min_ever": 7525,
       "pct_vs_min": 0.0,
       "is_new_min": false,
-      "n_points": 7,
+      "n_points": 8,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=MU20270401SSZTAR&Type=CROL&MacroCategory=OUT&Category=OB&NewCruise=true#/pricing"
     },
     {
@@ -41,7 +41,7 @@
       "min_ever": 8912,
       "pct_vs_min": 0.0,
       "is_new_min": false,
-      "n_points": 7,
+      "n_points": 8,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=VI20270403SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
     }
   ]
