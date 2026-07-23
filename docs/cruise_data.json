@@ -1,21 +1,7 @@
 {
-  "updated_at": "2026-07-23T11:56:58.395614+00:00",
-  "updated_fmt": "23/07/2026 08:56",
+  "updated_at": "2026-07-23T22:54:40.316241+00:00",
+  "updated_fmt": "23/07/2026 19:53",
   "cruises": [
-    {
-      "id": "divina",
-      "name": "MSC Divina",
-      "route": "Santos → Barcelona",
-      "date_fmt": "14 Mar 2027",
-      "nights": 16,
-      "cabin": "Cabine Interna",
-      "price": 7233,
-      "min_ever": 7233,
-      "pct_vs_min": 0.0,
-      "is_new_min": false,
-      "n_points": 14,
-      "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=DI20270314SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
-    },
     {
       "id": "musica",
       "name": "MSC Musica",
@@ -29,6 +15,20 @@
       "is_new_min": false,
       "n_points": 14,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=MU20270401SSZTAR&Type=CROL&MacroCategory=OUT&Category=OB&NewCruise=true#/pricing"
+    },
+    {
+      "id": "divina",
+      "name": "MSC Divina",
+      "route": "Santos → Barcelona",
+      "date_fmt": "14 Mar 2027",
+      "nights": 16,
+      "cabin": "Cabine Interna",
+      "price": 7643,
+      "min_ever": 7233,
+      "pct_vs_min": 5.7,
+      "is_new_min": false,
+      "n_points": 14,
+      "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=DI20270314SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
     },
     {
       "id": "virtuosa",
