@@ -12,50 +12,44 @@ concurrency:
 jobs:
   search:
     name: Buscar preços e publicar painel
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
       - name: Instalar dependências Python
         run: pip install -r requirements.txt
-      - name: Cache do Chromium (Playwright)
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
       - name: Instalar Chromium + dependências de sistema
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: playwright install chromium --with-deps
-      - name: Dependências de sistema (Chromium já em cache)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: playwright install-deps chromium
+        run: python -m playwright install chromium --with-deps
       - name: Buscar preços de voos
         env:
           TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           OUTPUT_DIR:       docs
-        run: python search.py
+        shell: bash
+        run: python -u search.py 2>&1 | tee log_voos.txt
       - name: Buscar preços de cruzeiros
         env:
           TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           OUTPUT_DIR:       docs
-        run: python cruise_monitor.py
-      - name: Salvar screenshots de diagnóstico
+        shell: bash
+        run: python -u cruise_monitor.py 2>&1 | tee log_cruzeiros.txt
+      - name: Salvar diagnóstico (screenshots e logs)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: debug-screenshots
           path: |
             *.png
             *.html
+            log_voos.txt
+            log_cruzeiros.txt
           if-no-files-found: ignore
           retention-days: 5
       - name: Commitar dados atualizados
