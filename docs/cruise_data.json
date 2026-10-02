@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-10-02T01:26:17.063911+00:00",
-  "updated_fmt": "01/10/2026 22:25",
+  "updated_at": "2026-10-02T16:22:25.832242+00:00",
+  "updated_fmt": "02/10/2026 13:21",
   "cruises": [
     {
       "id": "musica",
@@ -13,7 +13,7 @@
       "min_ever": 7525,
       "pct_vs_min": 6.4,
       "is_new_min": false,
-      "n_points": 24,
+      "n_points": 25,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=MU20270401SSZTAR&Type=CROL&MacroCategory=OUT&Category=OB&NewCruise=true#/pricing"
     },
     {
@@ -27,7 +27,7 @@
       "min_ever": 7233,
       "pct_vs_min": 19.1,
       "is_new_min": false,
-      "n_points": 24,
+      "n_points": 25,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=DI20270314SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
     },
     {
@@ -41,7 +41,7 @@
       "min_ever": 8912,
       "pct_vs_min": 0.0,
       "is_new_min": false,
-      "n_points": 24,
+      "n_points": 25,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=VI20270403SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
     }
   ]
