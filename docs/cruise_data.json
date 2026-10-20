@@ -1,21 +1,7 @@
 {
-  "updated_at": "2026-10-19T17:09:07.056908+00:00",
-  "updated_fmt": "19/10/2026 14:08",
+  "updated_at": "2026-10-20T01:06:23.161308+00:00",
+  "updated_fmt": "19/10/2026 22:04",
   "cruises": [
-    {
-      "id": "musica",
-      "name": "MSC Musica",
-      "route": "Santos → Tarragona",
-      "date_fmt": "01 Abr 2027",
-      "nights": 14,
-      "cabin": "Cabine Externa",
-      "price": 8005,
-      "min_ever": 7525,
-      "pct_vs_min": 6.4,
-      "is_new_min": false,
-      "n_points": 42,
-      "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=MU20270401SSZTAR&Type=CROL&MacroCategory=OUT&Category=OB&NewCruise=true#/pricing"
-    },
     {
       "id": "divina",
       "name": "MSC Divina",
