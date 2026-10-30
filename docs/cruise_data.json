@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-10-29T17:00:41.578283+00:00",
-  "updated_fmt": "29/10/2026 13:59",
+  "updated_at": "2026-10-30T01:43:57.416565+00:00",
+  "updated_fmt": "29/10/2026 22:43",
   "cruises": [
     {
       "id": "musica",
@@ -23,12 +23,26 @@
       "date_fmt": "14 Mar 2027",
       "nights": 16,
       "cabin": "Cabine Interna",
-      "price": 8613,
+      "price": 8483,
       "min_ever": 7233,
-      "pct_vs_min": 19.1,
+      "pct_vs_min": 17.3,
       "is_new_min": false,
       "n_points": 52,
       "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=DI20270314SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
+    },
+    {
+      "id": "virtuosa",
+      "name": "MSC Virtuosa",
+      "route": "Rio de Janeiro → Barcelona",
+      "date_fmt": "04 Abr 2027",
+      "nights": 16,
+      "cabin": "Cabine Interna",
+      "price": 8912,
+      "min_ever": 8912,
+      "pct_vs_min": 0.0,
+      "is_new_min": false,
+      "n_points": 52,
+      "url": "https://www.msccruzeiros.com.br/Booking?CruiseID=VI20270403SSZBCN&Type=CROL&MacroCategory=INS&Category=IB&NewCruise=true#/pricing"
     }
   ]
 }
